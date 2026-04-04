@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        getUserRole() in ['admin', 'super-admin'];
+    }
+
+    function isEditor() {
+      return isAuthenticated() &&
+        getUserRole() in ['editor', 'senior-editor', 'admin', 'super-admin'];
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(uid);
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /fetch_sessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /news/{articleId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /rewrites/{rewriteId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /images/{imageId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /captions/{captionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /publish_jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    match /stories/{storyId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isEditor();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /social_accounts/{accountId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /login_activity/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+  }
+}

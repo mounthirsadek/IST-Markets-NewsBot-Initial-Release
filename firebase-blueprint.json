@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "editor", "viewer"] },
+        "is_active": { "type": "boolean" },
+        "last_login_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "NewsFetchSession": {
+      "title": "News Fetch Session",
+      "description": "Log of a news fetching operation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fetched_by": { "type": "string", "description": "UID of the user" },
+        "fetched_at": { "type": "string", "format": "date-time" },
+        "total_articles": { "type": "integer" },
+        "approved_articles": { "type": "integer" },
+        "rejected_articles": { "type": "integer" }
+      },
+      "required": ["fetched_by", "fetched_at"]
+    },
+    "NewsArticle": {
+      "title": "News Article",
+      "description": "Raw news article fetched from external APIs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "headline": { "type": "string" },
+        "source_name": { "type": "string" },
+        "article_body": { "type": "string" },
+        "published_at_source": { "type": "string", "format": "date-time" },
+        "asset_tags": { "type": "array", "items": { "type": "string" } },
+        "article_url": { "type": "string" },
+        "theme": { "type": "string" },
+        "safety_status": { "type": "string", "enum": ["pending", "safe", "unsafe"] },
+        "rejection_reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "processed", "rejected"] }
+      },
+      "required": ["headline", "article_url", "source_name", "status"]
+    },
+    "ArticleRewrite": {
+      "title": "Article Rewrite",
+      "description": "AI-rewritten content in multiple languages.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "article_id": { "type": "string" },
+        "en_text": { "type": "string" },
+        "ar_text": { "type": "string" },
+        "en_status": { "type": "string", "enum": ["draft", "approved"] },
+        "ar_status": { "type": "string", "enum": ["draft", "approved"] },
+        "regenerated_count": { "type": "integer" },
+        "edited_by": { "type": "string" },
+        "approved_by": { "type": "string" }
+      },
+      "required": ["article_id"]
+    },
+    "GeneratedImage": {
+      "title": "Generated Image",
+      "description": "AI-generated visual content.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "article_id": { "type": "string" },
+        "language": { "type": "string", "enum": ["en", "ar"] },
+        "format": { "type": "string" },
+        "image_url": { "type": "string" },
+        "prompt_payload": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] }
+      },
+      "required": ["article_id", "image_url"]
+    },
+    "GeneratedCaption": {
+      "title": "Generated Caption",
+      "description": "AI-generated Instagram caption and hashtags.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "article_id": { "type": "string" },
+        "language": { "type": "string", "enum": ["en", "ar"] },
+        "caption_text": { "type": "string" },
+        "hashtags": { "type": "array", "items": { "type": "string" } },
+        "links_block": { "type": "string" },
+        "disclaimer_block": { "type": "string" }
+      },
+      "required": ["article_id", "caption_text"]
+    },
+    "PublishJob": {
+      "title": "Publish Job",
+      "description": "Log of a publishing operation to social media.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "article_id": { "type": "string" },
+        "target_account": { "type": "string" },
+        "language": { "type": "string", "enum": ["en", "ar"] },
+        "post_format": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "scheduled", "published", "failed"] },
+        "scheduled_for": { "type": "string", "format": "date-time" },
+        "published_at": { "type": "string", "format": "date-time" },
+        "post_url": { "type": "string" },
+        "failure_reason": { "type": "string" }
+      },
+      "required": ["article_id", "status"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Log of user actions for security and auditing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "action_type": { "type": "string" },
+        "entity_type": { "type": "string" },
+        "entity_id": { "type": "string" },
+        "before_data": { "type": "object" },
+        "after_data": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "action_type", "created_at"]
+    },
+    "BrandSettings": {
+      "title": "Brand Settings",
+      "description": "Visual and brand configuration for content generation.",
+      "type": "object",
+      "properties": {
+        "logo_url": { "type": "string" },
+        "logo_position": { "type": "string" },
+        "logo_size": { "type": "string" },
+        "background_style": { "type": "string" },
+        "fixed_tagline": { "type": "string" },
+        "tagline_position": { "type": "string" },
+        "footer_disclaimer": { "type": "string" },
+        "default_accent_color": { "type": "string" },
+        "is_active": { "type": "boolean" }
+      }
+    },
+    "SocialAccount": {
+      "title": "Social Account",
+      "description": "Configured social media accounts for publishing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "platform": { "type": "string" },
+        "account_handle": { "type": "string" },
+        "language": { "type": "string", "enum": ["en", "ar"] },
+        "access_token_ref": { "type": "string" },
+        "is_active": { "boolean": true }
+      },
+      "required": ["platform", "account_handle"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles." },
+    "/fetch_sessions/{sessionId}": { "schema": "NewsFetchSession", "description": "News fetching logs." },
+    "/news/{articleId}": { "schema": "NewsArticle", "description": "Raw news articles." },
+    "/rewrites/{rewriteId}": { "schema": "ArticleRewrite", "description": "AI-rewritten content." },
+    "/images/{imageId}": { "schema": "GeneratedImage", "description": "AI-generated visuals." },
+    "/captions/{captionId}": { "schema": "GeneratedCaption", "description": "AI-generated captions." },
+    "/publish_jobs/{jobId}": { "schema": "PublishJob", "description": "Publishing logs." },
+    "/audit_logs/{logId}": { "schema": "AuditLog", "description": "System audit logs." },
+    "/settings/brand": { "schema": "BrandSettings", "description": "Global brand settings." },
+    "/social_accounts/{accountId}": { "schema": "SocialAccount", "description": "Social media accounts." }
+  }
+}

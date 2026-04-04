@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg: #0a0a0a;
+  --ink: #ffffff;
+  --accent: #f27d26;
+  --line: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* ── Dark theme for all native select dropdowns ──────────────────────────
+   Tailwind bg-* classes don't apply to <option>/<optgroup> (browser-native).
+   color-scheme: dark is the correct cross-browser fix.                    */
+select {
+  color-scheme: dark;
+  background-color: #1a1a1f;
+  color: #ffffff;
+}
+
+option {
+  background-color: #1a1a1f;
+  color: #ffffff;
+}
+
+option:checked {
+  background-color: #f27d26;
+  color: #000000;
+}
+
+optgroup {
+  background-color: #111114;
+  color: rgba(255, 255, 255, 0.40);
+  font-style: normal;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
