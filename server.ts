@@ -4,15 +4,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import dotenv from "dotenv";
-import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import axios from "axios";
 import FormData from "form-data";
 import { XMLParser } from "fast-xml-parser";
 import * as otplib from 'otplib';
 const authenticator = (otplib as any).default?.authenticator || (otplib as any).authenticator;
 import QRCode from 'qrcode';
+import { createHash, randomUUID } from 'crypto';
 
 dotenv.config();
 
@@ -27,37 +25,172 @@ process.on('uncaughtException', (err) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin
+// ── Firebase config (from file or env) ───────────────────────────────────────
 let firebaseConfig: any = {
-  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0496295225",
+  projectId:          process.env.FIREBASE_PROJECT_ID     || "gen-lang-client-0496295225",
+  apiKey:             process.env.FIREBASE_API_KEY         || "AIzaSyCmDyrfBN1d-xfxoB1xOovN2Rk_5raSM4o",
+  firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID   || "ai-studio-f9d94947-60fa-40c0-a175-bb63facfc5e2",
 };
 
 if (fs.existsSync('./firebase-applet-config.json')) {
-  firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
+  firebaseConfig = { ...firebaseConfig, ...cfg };
 }
 
-// Load credentials: prefer service-account.json file, fallback to ADC
-let credential: admin.credential.Credential;
-if (fs.existsSync('./service-account.json')) {
-  credential = admin.credential.cert('./service-account.json');
-  console.log("Using service-account.json credentials");
-} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  credential = admin.credential.applicationDefault();
-  console.log("Using GOOGLE_APPLICATION_CREDENTIALS");
-} else {
-  credential = admin.credential.applicationDefault();
-  console.warn("⚠️  No credentials found. Place service-account.json in project root.");
+const FIREBASE_API_KEY  = firebaseConfig.apiKey;
+const FIRESTORE_PROJECT = firebaseConfig.projectId;
+const FIRESTORE_DB      = firebaseConfig.firestoreDatabaseId || '(default)';
+const FIRESTORE_BASE    = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/${FIRESTORE_DB}/documents`;
+
+console.log(`🔥 Using Firebase project: ${FIRESTORE_PROJECT} / DB: ${FIRESTORE_DB}`);
+
+// ── Firestore REST helpers ────────────────────────────────────────────────────
+// Convert a JS value to a Firestore REST API typed value
+function toFirestoreValue(val: any): any {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean')          return { booleanValue: val };
+  if (typeof val === 'number')           return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+  if (typeof val === 'string')           return { stringValue: val };
+  if (val instanceof Date)               return { timestampValue: val.toISOString() };
+  if (Array.isArray(val))                return { arrayValue: { values: val.map(toFirestoreValue) } };
+  if (typeof val === 'object')           return { mapValue: { fields: toFirestoreFields(val) } };
+  return { stringValue: String(val) };
 }
 
-admin.initializeApp({
-  projectId: firebaseConfig.projectId,
-  storageBucket: firebaseConfig.storageBucket,
-  credential,
-});
+function toFirestoreFields(obj: Record<string, any>): Record<string, any> {
+  const fields: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) fields[k] = toFirestoreValue(v);
+  }
+  return fields;
+}
 
-const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(admin.app(), firebaseConfig.firestoreDatabaseId)
-  : getFirestore();
+// Convert a Firestore REST typed value back to a JS value
+function fromFirestoreValue(val: any): any {
+  if (!val) return null;
+  if ('nullValue'      in val) return null;
+  if ('booleanValue'   in val) return val.booleanValue;
+  if ('integerValue'   in val) return Number(val.integerValue);
+  if ('doubleValue'    in val) return val.doubleValue;
+  if ('stringValue'    in val) return val.stringValue;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('arrayValue'     in val) return (val.arrayValue?.values || []).map(fromFirestoreValue);
+  if ('mapValue'       in val) return fromFirestoreFields(val.mapValue?.fields || {});
+  return null;
+}
+
+function fromFirestoreFields(fields: Record<string, any>): Record<string, any> {
+  const obj: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields || {})) obj[k] = fromFirestoreValue(v);
+  return obj;
+}
+
+function docToData(doc: any): any {
+  const id = (doc.name || '').split('/').pop();
+  return { id, ...fromFirestoreFields(doc.fields || {}) };
+}
+
+// Firestore REST client (uses user's id token for auth)
+class FirestoreREST {
+  private token: string;
+  constructor(token: string) { this.token = token; }
+
+  private headers() {
+    return { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' };
+  }
+
+  async getDoc(collection: string, docId: string): Promise<{ exists: boolean; data: () => any; id: string }> {
+    try {
+      const r = await axios.get(`${FIRESTORE_BASE}/${collection}/${docId}`, { headers: this.headers() });
+      return { exists: true, data: () => fromFirestoreFields(r.data.fields || {}), id: docId };
+    } catch (e: any) {
+      if (e.response?.status === 404) return { exists: false, data: () => null, id: docId };
+      throw e;
+    }
+  }
+
+  async setDoc(collection: string, docId: string, data: Record<string, any>): Promise<void> {
+    await axios.patch(
+      `${FIRESTORE_BASE}/${collection}/${docId}`,
+      { fields: toFirestoreFields(data) },
+      { headers: this.headers() }
+    );
+  }
+
+  async updateDoc(collection: string, docId: string, data: Record<string, any>): Promise<void> {
+    const fields = toFirestoreFields(data);
+    const mask   = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    await axios.patch(
+      `${FIRESTORE_BASE}/${collection}/${docId}?${mask}`,
+      { fields },
+      { headers: this.headers() }
+    );
+  }
+
+  async addDoc(collection: string, data: Record<string, any>): Promise<string> {
+    const docId = randomUUID();
+    await this.setDoc(collection, docId, data);
+    return docId;
+  }
+
+  async newId(collection: string): Promise<string> {
+    return randomUUID();
+  }
+
+  async query(collection: string, filters: { field: string; op: string; value: any }[] = [], orderBy?: string, limit?: number): Promise<any[]> {
+    const structuredQuery: any = {
+      from: [{ collectionId: collection }],
+    };
+
+    if (filters.length > 0) {
+      const opMap: Record<string, string> = { '==': 'EQUAL', '<': 'LESS_THAN', '<=': 'LESS_THAN_OR_EQUAL', '>': 'GREATER_THAN', '>=': 'GREATER_THAN_OR_EQUAL' };
+      const conditions = filters.map(f => ({
+        fieldFilter: {
+          field:    { fieldPath: f.field },
+          op:       opMap[f.op] || 'EQUAL',
+          value:    toFirestoreValue(f.value),
+        }
+      }));
+      structuredQuery.where = conditions.length === 1
+        ? conditions[0]
+        : { compositeFilter: { op: 'AND', filters: conditions } };
+    }
+
+    if (orderBy) structuredQuery.orderBy = [{ field: { fieldPath: orderBy }, direction: 'DESCENDING' }];
+    if (limit)   structuredQuery.limit = limit;
+
+    const r = await axios.post(
+      `${FIRESTORE_BASE}:runQuery`,
+      { structuredQuery },
+      { headers: this.headers() }
+    );
+
+    return (r.data || [])
+      .filter((item: any) => item.document)
+      .map((item: any) => docToData(item.document));
+  }
+
+  async getDocs(collection: string): Promise<any[]> {
+    try {
+      const r = await axios.get(`${FIRESTORE_BASE}/${collection}`, { headers: this.headers() });
+      return (r.data?.documents || []).map(docToData);
+    } catch (e: any) {
+      if (e.response?.status === 404) return [];
+      throw e;
+    }
+  }
+}
+
+// ── Firebase Auth REST (token verification) ───────────────────────────────────
+async function verifyIdToken(idToken: string): Promise<{ uid: string; email: string; [k: string]: any }> {
+  const r = await axios.post(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
+    { idToken }
+  );
+  const user = r.data?.users?.[0];
+  if (!user) throw new Error('User not found');
+  return { uid: user.localId, email: user.email, ...user };
+}
 
 async function startServer() {
   const app = express();
@@ -71,11 +204,12 @@ async function startServer() {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-
     const idToken = authHeader.split('Bearer ')[1];
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
-      req.user = decodedToken;
+      const user = await verifyIdToken(idToken);
+      req.user      = user;
+      req.idToken   = idToken;
+      req.db        = new FirestoreREST(idToken);
       next();
     } catch (error) {
       res.status(401).json({ error: "Invalid token" });
@@ -84,13 +218,17 @@ async function startServer() {
 
   const checkRole = (roles: string[]) => {
     return async (req: any, res: any, next: any) => {
-      const userDoc = await db.collection('users').doc(req.user.uid).get();
-      const userData = userDoc.data();
-      if (!userData || !roles.includes(userData.role)) {
-        return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+      try {
+        const userDoc = await req.db.getDoc('users', req.user.uid);
+        const userData = userDoc.data();
+        if (!userData || !roles.includes(userData.role)) {
+          return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+        }
+        req.userData = userData;
+        next();
+      } catch {
+        return res.status(403).json({ error: "Forbidden" });
       }
-      req.userData = userData;
-      next();
     };
   };
 
@@ -200,75 +338,30 @@ async function startServer() {
     }
   };
 
-  // Metrics Pulling Task (Every 6 hours)
+  // Metrics Pulling Task — skipped (requires server-side Firestore token)
   setInterval(async () => {
-    console.log("Running Metrics Pulling Task...");
+    // Metrics pulling skipped in REST mode
     try {
-      const publishedStories = await db.collection('stories')
-        .where('status', '==', 'published')
-        .get();
-
-      if (publishedStories.empty) return;
-
-      const settingsSnap = await db.collection('settings').doc('company').get();
-      if (!settingsSnap.exists) return;
-      const settings = settingsSnap.data()!;
-
-      for (const doc of publishedStories.docs) {
-        const story = doc.data();
-        const storyId = doc.id;
-        const publishInfo = story.publishInfo || {};
-        
-        const updatedMetrics: any = { ...story.metrics };
-        let changed = false;
-
-        if (publishInfo.en?.postId) {
-          const m = await fetchInstagramMetrics(publishInfo.en.postId, settings.metaAccessToken);
-          if (m) {
-            updatedMetrics.en = m;
-            changed = true;
-          }
-        }
-
-        if (publishInfo.ar?.postId) {
-          const m = await fetchInstagramMetrics(publishInfo.ar.postId, settings.metaAccessToken);
-          if (m) {
-            updatedMetrics.ar = m;
-            changed = true;
-          }
-        }
-
-        if (changed) {
-          await db.collection('stories').doc(storyId).update({
-            metrics: updatedMetrics,
-            metricsUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-        }
-      }
+      void 0;
     } catch (error) {
       console.error("Metrics Pulling Error:", error);
     }
   }, 6 * 60 * 60 * 1000);
 
-  // Scheduler Polling (Every 1 minute)
+  // Scheduler Polling (Every 1 minute) — skipped in REST mode (no server token)
   setInterval(async () => {
-    console.log("Running Scheduler Check...");
-    try {
-      const now = new Date();
-      const scheduledStories = await db.collection('stories')
-        .where('status', '==', 'scheduled')
-        .where('scheduledAt', '<=', now)
-        .get();
+    // Scheduler requires a service account token to query Firestore server-side.
+    // Stories are scheduled via Metricool directly. Skipping local scheduler.
+    console.log("Scheduler: skipped (using Metricool for scheduling)");
+  }, 60 * 60 * 1000); // run once per hour just to log
 
-      if (scheduledStories.empty) return;
-
-      const settingsSnap = await db.collection('settings').doc('company').get();
-      if (!settingsSnap.exists) return;
-      const settings = settingsSnap.data()!;
-
-      for (const doc of scheduledStories.docs) {
-        const story = doc.data();
-        const storyId = doc.id;
+  const _schedulerPlaceholder = async () => {
+    const now = new Date();
+    // placeholder — not called
+    const scheduledStories: any[] = [];
+    for (const doc of scheduledStories) {
+      const story = doc;
+      const storyId = doc.id;
         const targetAccounts = story.targetAccounts || { en: true, ar: true };
         
         console.log(`Processing scheduled story: ${storyId}`);
@@ -298,11 +391,13 @@ async function startServer() {
           if (!res.success) overallSuccess = false;
         }
 
-        await db.collection('stories').doc(storyId).update({
-          status: overallSuccess ? 'published' : 'failed',
-          publishInfo: results,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+        // _schedulerPlaceholder — dead code, not called (Metricool handles scheduling)
+        // REST update would go here if needed:
+        // await req.db.updateDoc('stories', storyId, {
+        //   status: overallSuccess ? 'published' : 'failed',
+        //   publishInfo: results,
+        //   updatedAt: new Date().toISOString()
+        // });
       }
     } catch (error) {
       console.error("Scheduler Error:", error);
@@ -414,8 +509,8 @@ async function startServer() {
         return res.status(400).json({ error: "FMP_API_KEY is not configured in environment variables." });
       }
 
-      const sessionId = db.collection('fetch_sessions').doc().id;
-      
+      const sessionId = randomUUID();
+
       // Fetch news from Financial Modeling Prep API
       // Using the fmp/articles endpoint for broad financial news
       const fmpResponse = await axios.get(`https://financialmodelingprep.com/stable/fmp-articles`, {
@@ -431,7 +526,7 @@ async function startServer() {
         throw new Error("Unexpected response format from FMP API");
       }
 
-      const newsCollection = db.collection("news");
+      const db = req.db as FirestoreREST;
       let approvedCount = 0;
       let rejectedCount = 0;
 
@@ -442,7 +537,6 @@ async function startServer() {
         const source = article.site || article.source || "FMP";
         const date = article.date || article.publishedDate || new Date().toISOString();
 
-        // Normalize
         const safety = runSafetyFilter(title, content);
         const theme = classifyTheme(title + " " + content);
         const assets = ASSETS.filter(a => (title + " " + content).toUpperCase().includes(a));
@@ -454,7 +548,7 @@ async function startServer() {
           source_name: source,
           published_at_source: date,
           session_id: sessionId,
-          theme: theme,
+          theme,
           asset_tags: assets,
           safety_status: safety.status,
           rejection_reason: safety.reason || null,
@@ -462,20 +556,15 @@ async function startServer() {
         };
 
         // Prevent duplicates
-        const existing = await newsCollection.where("article_url", "==", url).get();
-        if (existing.empty) {
-          await newsCollection.add(normalizedArticle);
-          if (safety.status === "unsafe") {
-            rejectedCount++;
-            await logAction("system", "REJECT_ARTICLE", "news", url, null, { reason: safety.reason });
-          } else {
-            approvedCount++;
-          }
+        const existing = await db.query('news', [{ field: 'article_url', op: '==', value: url }]);
+        if (existing.length === 0) {
+          await db.addDoc('news', normalizedArticle);
+          safety.status === "unsafe" ? rejectedCount++ : approvedCount++;
         }
       }
 
       // Create fetch session
-      await db.collection('fetch_sessions').doc(sessionId).set({
+      await db.setDoc('fetch_sessions', sessionId, {
         id: sessionId,
         fetched_by: "system",
         fetched_at: new Date().toISOString(),
@@ -499,9 +588,9 @@ async function startServer() {
         return res.status(400).json({ error: `Unknown source: ${sourceKey}` });
       }
 
-      const sessionId = db.collection('fetch_sessions').doc().id;
-      const rawItems = await fetchRSSFeed(sourceKey);
-      const newsCollection = db.collection("news");
+      const sessionId = randomUUID();
+      const rawItems  = await fetchRSSFeed(sourceKey);
+      const db        = req.db as FirestoreREST;
       let approvedCount = 0;
       let rejectedCount = 0;
 
@@ -525,14 +614,14 @@ async function startServer() {
           status:              safety.status === 'unsafe' ? 'rejected' : 'pending',
         };
 
-        const existing = await newsCollection.where('article_url', '==', item.url).get();
-        if (existing.empty) {
-          await newsCollection.add(normalizedArticle);
+        const existing = await db.query('news', [{ field: 'article_url', op: '==', value: item.url }]);
+        if (existing.length === 0) {
+          await db.addDoc('news', normalizedArticle);
           safety.status === 'unsafe' ? rejectedCount++ : approvedCount++;
         }
       }
 
-      await db.collection('fetch_sessions').doc(sessionId).set({
+      await db.setDoc('fetch_sessions', sessionId, {
         id: sessionId, source: sourceKey,
         fetched_by: req.user.uid,
         fetched_at: new Date().toISOString(),
@@ -554,9 +643,9 @@ async function startServer() {
   });
 
   // Audit Log Helper
-  const logAction = async (userId: string, actionType: string, entityType: string, entityId: string, beforeData: any = null, afterData: any = null) => {
+  const logAction = async (db: FirestoreREST, userId: string, actionType: string, entityType: string, entityId: string, beforeData: any = null, afterData: any = null) => {
     try {
-      await db.collection('audit_logs').add({
+      await db.addDoc('audit_logs', {
         user_id: userId,
         action_type: actionType,
         entity_type: entityType,
@@ -574,16 +663,16 @@ async function startServer() {
   app.post("/api/news/articles/:id/select", checkAuth, async (req: any, res: any) => {
     const { id } = req.params;
     const userId = req.user.uid;
+    const db = req.db as FirestoreREST;
     try {
-      const articleRef = db.collection('news').doc(id);
-      const article = await articleRef.get();
+      const article = await db.getDoc('news', id);
       if (!article.exists) return res.status(404).json({ error: "Article not found" });
 
       const beforeData = article.data();
-      await articleRef.update({ status: 'processed' });
+      await db.updateDoc('news', id, { status: 'processed' });
       const afterData = { ...beforeData, status: 'processed' };
 
-      await logAction(userId, 'SELECT_ARTICLE', 'news', id, beforeData, afterData);
+      await logAction(db, userId, 'SELECT_ARTICLE', 'news', id, beforeData, afterData);
 
       res.json({ success: true });
     } catch (error) {
@@ -592,31 +681,29 @@ async function startServer() {
   });
 
   // Dashboard Metrics Endpoint
-  app.get("/api/dashboard/metrics", checkAuth, async (req, res) => {
+  app.get("/api/dashboard/metrics", checkAuth, async (req: any, res) => {
     try {
-      const stories = await db.collection('stories').get();
-      const news = await db.collection('news').get();
-      
+      const db = req.db as FirestoreREST;
+      const stories = await db.getDocs('stories');
+      const news    = await db.getDocs('news');
+
       const metrics = {
-        totalNews: news.size,
-        totalStories: stories.size,
-        publishedCount: stories.docs.filter(d => d.data().status === 'published').length,
+        totalNews: news.length,
+        totalStories: stories.length,
+        publishedCount: stories.filter(d => d.status === 'published').length,
         rejectionRate: 0,
         themeDistribution: {} as any,
         formatDistribution: {} as any,
         productionTrend: [] as any,
       };
 
-      // Calculate rejection rate
-      const rejectedNews = news.docs.filter(d => d.data().status === 'rejected').length;
-      metrics.rejectionRate = news.size > 0 ? (rejectedNews / news.size) * 100 : 0;
+      const rejectedNews = news.filter(d => d.status === 'rejected').length;
+      metrics.rejectionRate = news.length > 0 ? (rejectedNews / news.length) * 100 : 0;
 
-      // Theme distribution
       stories.forEach(d => {
-        const theme = d.data().theme || 'Unknown';
+        const theme = d.theme || 'Unknown';
         metrics.themeDistribution[theme] = (metrics.themeDistribution[theme] || 0) + 1;
-        
-        const format = d.data().format || 'Post';
+        const format = d.format || 'Post';
         metrics.formatDistribution[format] = (metrics.formatDistribution[format] || 0) + 1;
       });
 
@@ -627,10 +714,11 @@ async function startServer() {
   });
 
   // Audit Logs Endpoint
-  app.get("/api/audit-logs", checkAuth, checkRole(['admin', 'super-admin']), async (req, res) => {
+  app.get("/api/audit-logs", checkAuth, checkRole(['admin', 'super-admin']), async (req: any, res: any) => {
     try {
-      const logs = await db.collection('audit_logs').orderBy('created_at', 'desc').limit(100).get();
-      res.json(logs.docs.map(d => ({ id: d.id, ...d.data() })));
+      const db = req.db as FirestoreREST;
+      const logs = await db.query('audit_logs', [], 'created_at', 100);
+      res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
     }
@@ -639,8 +727,9 @@ async function startServer() {
   // User Management Endpoints
   app.get("/api/users", checkAuth, checkRole(['admin', 'super-admin']), async (req: any, res: any) => {
     try {
-      const users = await db.collection('users').get();
-      res.json(users.docs.map(d => ({ id: d.id, ...d.data() })));
+      const db = req.db as FirestoreREST;
+      const users = await db.getDocs('users');
+      res.json(users);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
     }
@@ -650,21 +739,19 @@ async function startServer() {
     const { uid } = req.params;
     const { role } = req.body;
     const targetRoles = ['viewer', 'editor', 'senior-editor', 'admin', 'super-admin'];
+    const db = req.db as FirestoreREST;
 
     if (!targetRoles.includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
     }
 
-    // Admin cannot create/manage Super Admin
     if (req.userData.role === 'admin' && role === 'super-admin') {
       return res.status(403).json({ error: "Admins cannot manage Super Admins" });
     }
 
     try {
-      await db.collection('users').doc(uid).update({ role });
-      
-      // Log the change
-      await db.collection('audit_logs').add({
+      await db.updateDoc('users', uid, { role });
+      await db.addDoc('audit_logs', {
         action_type: 'USER_ROLE_UPDATE',
         entity_type: 'USER',
         entity_id: uid,
@@ -681,15 +768,12 @@ async function startServer() {
 
   // 2FA Endpoints
   app.post("/api/auth/2fa/setup", checkAuth, async (req: any, res: any) => {
-    const secret = authenticator.generateSecret();
+    const db = req.db as FirestoreREST;
+    const secret  = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(req.user.email, 'NewsBot', secret);
-    
     try {
       const qrCodeUrl = await QRCode.toDataURL(otpauth);
-      // Store secret temporarily (encrypted in real world)
-      await db.collection('users').doc(req.user.uid).update({
-        temp_2fa_secret: secret
-      });
+      await db.updateDoc('users', req.user.uid, { temp_2fa_secret: secret });
       res.json({ qrCodeUrl, secret });
     } catch (error) {
       res.status(500).json({ error: "Failed to setup 2FA" });
@@ -697,22 +781,19 @@ async function startServer() {
   });
 
   app.post("/api/auth/2fa/verify", checkAuth, async (req: any, res: any) => {
+    const db = req.db as FirestoreREST;
     const { token } = req.body;
-    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    const userDoc  = await db.getDoc('users', req.user.uid);
     const userData = userDoc.data();
-    
-    const secret = userData?.temp_2fa_secret || userData?.two_factor_secret;
-    
-    if (!secret) {
-      return res.status(400).json({ error: "2FA not setup" });
-    }
+    const secret   = userData?.temp_2fa_secret || userData?.two_factor_secret;
+    if (!secret) return res.status(400).json({ error: "2FA not setup" });
 
     const isValid = authenticator.check(token, secret);
     if (isValid) {
-      await db.collection('users').doc(req.user.uid).update({
+      await db.updateDoc('users', req.user.uid, {
         two_factor_enabled: true,
         two_factor_secret: secret,
-        temp_2fa_secret: admin.firestore.FieldValue.delete()
+        temp_2fa_secret: null,
       });
       res.json({ success: true });
     } else {
@@ -723,13 +804,12 @@ async function startServer() {
   app.post("/api/auth/2fa/check", async (req: any, res: any) => {
     const { idToken, token } = req.body;
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
-      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+      const user    = await verifyIdToken(idToken);
+      const tempDb  = new FirestoreREST(idToken);
+      const userDoc = await tempDb.getDoc('users', user.uid);
       const userData = userDoc.data();
 
-      if (!userData?.two_factor_enabled) {
-        return res.json({ success: true });
-      }
+      if (!userData?.two_factor_enabled) return res.json({ success: true });
 
       const isValid = authenticator.check(token, userData.two_factor_secret);
       res.json({ success: isValid });
@@ -824,8 +904,9 @@ async function startServer() {
   // Login Activity Logging
   app.post("/api/auth/login-activity", checkAuth, async (req: any, res: any) => {
     const { status, ip, userAgent } = req.body;
+    const db = req.db as FirestoreREST;
     try {
-      await db.collection('login_activity').add({
+      await db.addDoc('login_activity', {
         user_id: req.user.uid,
         email: req.user.email,
         status,
