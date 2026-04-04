@@ -1,0 +1,29 @@
+# Dependencies (reinstalled inside Docker)
+node_modules
+
+# Built output (rebuilt inside Docker)
+dist
+
+# Environment secrets
+.env
+.env.local
+.env.production
+
+# Firebase service account (injected via env var at runtime)
+service-account.json
+*.json.key
+
+# Git
+.git
+.gitignore
+.github
+
+# Dev/editor
+.claude
+.vscode
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
