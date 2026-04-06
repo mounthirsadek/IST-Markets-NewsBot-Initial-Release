@@ -27,9 +27,9 @@ const __dirname = path.dirname(__filename);
 
 // ── Firebase config (from file or env) ───────────────────────────────────────
 let firebaseConfig: any = {
-  projectId:          process.env.FIREBASE_PROJECT_ID     || "gen-lang-client-0496295225",
-  apiKey:             process.env.FIREBASE_API_KEY         || "AIzaSyCmDyrfBN1d-xfxoB1xOovN2Rk_5raSM4o",
-  firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID   || "ai-studio-f9d94947-60fa-40c0-a175-bb63facfc5e2",
+  projectId:          process.env.FIREBASE_PROJECT_ID     || "istnewsbot",
+  apiKey:             process.env.FIREBASE_API_KEY         || "AIzaSyCaxR1aE82Dif26SKy6ykEo3ZFv0C3dhCI",
+  firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID   || "(default)",
 };
 
 if (fs.existsSync('./firebase-applet-config.json')) {

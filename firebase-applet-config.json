@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0496295225",
-  "appId": "1:1080620622995:web:9064c5bd847dacbc8d1966",
-  "apiKey": "AIzaSyCmDyrfBN1d-xfxoB1xOovN2Rk_5raSM4o",
-  "authDomain": "gen-lang-client-0496295225.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-f9d94947-60fa-40c0-a175-bb63facfc5e2",
-  "storageBucket": "gen-lang-client-0496295225.firebasestorage.app",
-  "messagingSenderId": "1080620622995",
-  "measurementId": ""
+  "apiKey": "AIzaSyCaxR1aE82Dif26SKy6ykEo3ZFv0C3dhCI",
+  "authDomain": "istnewsbot.firebaseapp.com",
+  "projectId": "istnewsbot",
+  "storageBucket": "istnewsbot.firebasestorage.app",
+  "messagingSenderId": "890812129068",
+  "appId": "1:890812129068:web:04ddfc640a5ac9aea11689",
+  "measurementId": "G-7CXF2TMTWL",
+  "firestoreDatabaseId": "(default)"
 }
