@@ -51,7 +51,7 @@ export const checkSafety = async (content: string): Promise<{ safe: boolean; rea
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -108,7 +108,7 @@ export const rewriteArticle = async (
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro",
+    model: "gemini-2.0-flash",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -162,7 +162,7 @@ Return ONLY valid JSON. Example: {"subjectName":"GOLD","mainElement":"shiny gold
 
   try {
     const extractRes = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: extractPrompt
     });
     const raw = extractRes.text || '{}';
@@ -247,7 +247,7 @@ export const generateSocialCaption = async (headline: string, caption: string): 
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     contents: prompt,
     config: {
       responseMimeType: "application/json",

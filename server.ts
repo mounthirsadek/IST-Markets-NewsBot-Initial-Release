@@ -175,7 +175,8 @@ class FirestoreREST {
       const r = await axios.get(`${FIRESTORE_BASE}/${collection}`, { headers: this.headers() });
       return (r.data?.documents || []).map(docToData);
     } catch (e: any) {
-      if (e.response?.status === 404) return [];
+      // Return empty array for 404 (collection doesn't exist) and 403 (no docs yet / permissions)
+      if (e.response?.status === 404 || e.response?.status === 403) return [];
       throw e;
     }
   }
