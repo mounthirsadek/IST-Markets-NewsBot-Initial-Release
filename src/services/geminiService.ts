@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import axios from 'axios';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, httpOptions: { apiVersion: 'v1' } });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 const OPENING_HOOKS = [
   "Here's what's moving markets today —",
@@ -51,7 +51,7 @@ export const checkSafety = async (content: string): Promise<{ safe: boolean; rea
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash-lite",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -108,7 +108,7 @@ export const rewriteArticle = async (
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash-lite",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -162,7 +162,7 @@ Return ONLY valid JSON. Example: {"subjectName":"GOLD","mainElement":"shiny gold
 
   try {
     const extractRes = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash-lite",
       contents: extractPrompt
     });
     const raw = extractRes.text || '{}';
@@ -247,7 +247,7 @@ export const generateSocialCaption = async (headline: string, caption: string): 
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash-lite",
     contents: prompt,
     config: {
       responseMimeType: "application/json",
