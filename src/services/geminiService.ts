@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import axios from 'axios';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, httpOptions: { apiVersion: 'v1' } });
 
 const OPENING_HOOKS = [
   "Here's what's moving markets today —",
