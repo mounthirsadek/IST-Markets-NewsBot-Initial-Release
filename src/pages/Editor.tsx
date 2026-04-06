@@ -59,12 +59,13 @@ const extractDominantColors = (dataUrl: string, topN = 5): Promise<string[]> =>
       const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const freq: Record<string, number> = {};
       for (let i = 0; i < data.length; i += 4 * 10) {
-        const r = Math.round(data[i]     / 32) * 32;
-        const g = Math.round(data[i + 1] / 32) * 32;
-        const b = Math.round(data[i + 2] / 32) * 32;
+        // Math.floor avoids overflow to 256 (which would produce 3-char hex "100")
+        const r = Math.min(240, Math.floor(data[i]     / 32) * 32);
+        const g = Math.min(240, Math.floor(data[i + 1] / 32) * 32);
+        const b = Math.min(240, Math.floor(data[i + 2] / 32) * 32);
         const isGray  = Math.abs(r - g) < 20 && Math.abs(g - b) < 20;
         const isDark  = r < 30  && g < 30  && b < 30;
-        const isLight = r > 220 && g > 220 && b > 220;
+        const isLight = r > 200 && g > 200 && b > 200;
         if (isGray || isDark || isLight) continue;
         const key = `${r},${g},${b}`;
         freq[key] = (freq[key] || 0) + 1;
@@ -74,8 +75,10 @@ const extractDominantColors = (dataUrl: string, topN = 5): Promise<string[]> =>
         .slice(0, topN)
         .map(([key]) => {
           const [r, g, b] = key.split(',').map(Number);
-          return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-        });
+          const hex = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+          return hex.length === 7 ? hex : null; // guard: only return valid #rrggbb
+        })
+        .filter(Boolean) as string[];
       resolve(colors);
     };
     img.onerror = () => resolve([]);

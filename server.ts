@@ -254,18 +254,22 @@ async function startServer() {
       const ext = mimeType.includes('png') ? 'png' : 'jpg';
       const buffer = Buffer.from(matches[2], 'base64');
 
-      // Upload to Imgur (anonymous, free, no user auth required)
+      // Upload to Imgur (anonymous) — use JSON body to avoid encoding issues
       const imgurClientId = process.env.IMGUR_CLIENT_ID || '546c25a59c58ad7';
       const b64 = buffer.toString('base64');
-      const postData = `image=${encodeURIComponent(b64)}&type=base64`;
 
-      const imgurRes = await axios.post('https://api.imgur.com/3/image', postData, {
-        headers: {
-          Authorization: `Client-ID ${imgurClientId}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        timeout: 30000,
-      });
+      const imgurRes = await axios.post('https://api.imgur.com/3/image',
+        { image: b64, type: 'base64' },
+        {
+          headers: {
+            Authorization: `Client-ID ${imgurClientId}`,
+            'Content-Type': 'application/json',
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+          timeout: 30000,
+        }
+      );
 
       const url = imgurRes.data?.data?.link;
       if (!url) throw new Error('Imgur upload failed — no link returned');

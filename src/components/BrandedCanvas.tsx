@@ -270,7 +270,7 @@ export default function BrandedCanvas({
 
       // ── Export ──────────────────────────────────────────────────────
       if (onExport) {
-        onExport(canvas.toDataURL('image/png'));
+        onExport(canvas.toDataURL('image/jpeg', 0.92));
       }
     };
 
