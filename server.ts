@@ -238,46 +238,46 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // ─── Brand Asset Upload (server-side proxy to bypass CORS) ─────────────
+  // ─── Brand Asset Upload → Firebase Storage REST API ─────────────────────
   app.post("/api/upload-brand-asset", checkAuth, async (req: any, res: any) => {
     try {
       const { dataUrl } = req.body;
-      if (!dataUrl) {
-        return res.status(400).json({ error: "Missing dataUrl" });
-      }
+      if (!dataUrl) return res.status(400).json({ error: "Missing dataUrl" });
 
       const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches) {
-        return res.status(400).json({ error: "Invalid data URL format" });
-      }
+      if (!matches) return res.status(400).json({ error: "Invalid data URL format" });
+
       const mimeType = matches[1];
-      const ext = mimeType.includes('png') ? 'png' : 'jpg';
-      const buffer = Buffer.from(matches[2], 'base64');
+      const buffer   = Buffer.from(matches[2], 'base64');
+      const ext      = mimeType.includes('png') ? 'png' : 'jpg';
+      const filename = `branded-visuals/${randomUUID()}.${ext}`;
 
-      // Upload to Imgur (anonymous) — use JSON body to avoid encoding issues
-      const imgurClientId = process.env.IMGUR_CLIENT_ID || '546c25a59c58ad7';
-      const b64 = buffer.toString('base64');
+      // Upload to Firebase Storage using user's idToken (no service account needed)
+      const storageBucket = process.env.FIREBASE_STORAGE_BUCKET
+        || `${FIRESTORE_PROJECT}.firebasestorage.app`;
+      const encodedName = encodeURIComponent(filename);
+      const uploadUrl   = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o?name=${encodedName}&uploadType=media`;
 
-      const imgurRes = await axios.post('https://api.imgur.com/3/image',
-        { image: b64, type: 'base64' },
-        {
-          headers: {
-            Authorization: `Client-ID ${imgurClientId}`,
-            'Content-Type': 'application/json',
-          },
-          maxBodyLength: Infinity,
-          maxContentLength: Infinity,
-          timeout: 30000,
-        }
-      );
+      const uploadRes = await axios.post(uploadUrl, buffer, {
+        headers: {
+          Authorization: `Bearer ${req.idToken}`,
+          'Content-Type': mimeType,
+        },
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        timeout: 30000,
+      });
 
-      const url = imgurRes.data?.data?.link;
-      if (!url) throw new Error('Imgur upload failed — no link returned');
+      const downloadToken = uploadRes.data?.downloadTokens;
+      if (!downloadToken) throw new Error('Firebase Storage upload failed — no download token');
 
-      res.json({ url });
+      const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedName}?alt=media&token=${downloadToken}`;
+      res.json({ url: publicUrl });
+
     } catch (error: any) {
-      console.error("Brand asset upload failed:", error.message);
-      res.status(500).json({ error: error.message });
+      const detail = error.response?.data?.error?.message || error.message;
+      console.error("Brand asset upload failed:", detail);
+      res.status(500).json({ error: detail });
     }
   });
 
