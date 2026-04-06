@@ -33,6 +33,19 @@ interface BrandSettings {
   isActive: boolean;
 }
 
+const DEFAULT_BRAND_SETTINGS: BrandSettings = {
+  logoUrl: '',
+  logoPosition: 'top-left',
+  logoSize: 160,
+  backgroundStyle: 'dark',
+  backgroundImageUrl: '',
+  fixedTagline: 'IST MARKETS | INSTITUTIONAL GRADE ANALYSIS',
+  footerDisclaimer: 'This content is for informational purposes only and does not constitute financial advice.',
+  footerDisclaimer2: '',
+  defaultAccentColor: '#f27d26',
+  isActive: true,
+};
+
 export default function Editor() {
   const { articleId } = useParams();
   const navigate = useNavigate();
@@ -85,10 +98,14 @@ export default function Editor() {
       const docRef = doc(db, 'settings', 'brand');
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        setBrandSettings(docSnap.data() as BrandSettings);
+        setBrandSettings({ ...DEFAULT_BRAND_SETTINGS, ...docSnap.data() as BrandSettings });
+      } else {
+        // No brand settings saved yet — use defaults so canvas always renders
+        setBrandSettings(DEFAULT_BRAND_SETTINGS);
       }
     } catch (error) {
       console.error("Failed to fetch brand settings", error);
+      setBrandSettings(DEFAULT_BRAND_SETTINGS);
     }
   };
 
