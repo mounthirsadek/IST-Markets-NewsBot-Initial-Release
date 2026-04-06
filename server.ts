@@ -355,54 +355,7 @@ async function startServer() {
     console.log("Scheduler: skipped (using Metricool for scheduling)");
   }, 60 * 60 * 1000); // run once per hour just to log
 
-  const _schedulerPlaceholder = async () => {
-    const now = new Date();
-    // placeholder — not called
-    const scheduledStories: any[] = [];
-    for (const doc of scheduledStories) {
-      const story = doc;
-      const storyId = doc.id;
-        const targetAccounts = story.targetAccounts || { en: true, ar: true };
-        
-        console.log(`Processing scheduled story: ${storyId}`);
-
-        const results: any = {};
-        let overallSuccess = true;
-
-        if (targetAccounts.en) {
-          const res = await publishToInstagram(
-            story.enBrandedUrl, 
-            story.enCaptionFinal, 
-            settings.enInstagramId, 
-            settings.metaAccessToken
-          );
-          results.en = { ...res, publishedAt: new Date().toISOString() };
-          if (!res.success) overallSuccess = false;
-        }
-
-        if (targetAccounts.ar) {
-          const res = await publishToInstagram(
-            story.arBrandedUrl, 
-            story.arCaptionFinal, 
-            settings.arInstagramId, 
-            settings.metaAccessToken
-          );
-          results.ar = { ...res, publishedAt: new Date().toISOString() };
-          if (!res.success) overallSuccess = false;
-        }
-
-        // _schedulerPlaceholder — dead code, not called (Metricool handles scheduling)
-        // REST update would go here if needed:
-        // await req.db.updateDoc('stories', storyId, {
-        //   status: overallSuccess ? 'published' : 'failed',
-        //   publishInfo: results,
-        //   updatedAt: new Date().toISOString()
-        // });
-      }
-    } catch (error) {
-      console.error("Scheduler Error:", error);
-    }
-  }, 60000);
+  // Scheduler is handled entirely by Metricool — no local scheduler needed.
 
   // ─── RSS News Sources ─────────────────────────────────────────────────────
   const RSS_SOURCES: Record<string, { label: string; url: string; category: string }> = {
