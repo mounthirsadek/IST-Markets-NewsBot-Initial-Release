@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Sparkles, Image as ImageIcon, Send, Save, Languages, ChevronLeft, Loader2, XCircle, RefreshCw, AlertCircle, Download, Maximize2, X, Radio } from 'lucide-react';
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { rewriteArticle, generateStoryImage, generateVisualBrief, checkSafety, StoryContent } from '../services/geminiService';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
@@ -46,6 +46,42 @@ const DEFAULT_BRAND_SETTINGS: BrandSettings = {
   isActive: true,
 };
 
+// ─── Extract dominant colors from a base64 image (Canvas API, no deps) ─────
+const extractDominantColors = (dataUrl: string, topN = 5): Promise<string[]> =>
+  new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const freq: Record<string, number> = {};
+      for (let i = 0; i < data.length; i += 4 * 10) {
+        const r = Math.round(data[i]     / 32) * 32;
+        const g = Math.round(data[i + 1] / 32) * 32;
+        const b = Math.round(data[i + 2] / 32) * 32;
+        const isGray  = Math.abs(r - g) < 20 && Math.abs(g - b) < 20;
+        const isDark  = r < 30  && g < 30  && b < 30;
+        const isLight = r > 220 && g > 220 && b > 220;
+        if (isGray || isDark || isLight) continue;
+        const key = `${r},${g},${b}`;
+        freq[key] = (freq[key] || 0) + 1;
+      }
+      const colors = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, topN)
+        .map(([key]) => {
+          const [r, g, b] = key.split(',').map(Number);
+          return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+        });
+      resolve(colors);
+    };
+    img.onerror = () => resolve([]);
+    img.src = dataUrl;
+  });
+
 export default function Editor() {
   const { articleId } = useParams();
   const navigate = useNavigate();
@@ -74,6 +110,9 @@ export default function Editor() {
   const [versions, setVersions] = useState<any[]>([]);
   const [brandSettings, setBrandSettings] = useState<BrandSettings | null>(null);
   const [previewModal, setPreviewModal] = useState<string | null>(null);
+  const [extractedColors, setExtractedColors] = useState<string[]>([]);
+  const [selectedExtractedColor, setSelectedExtractedColor] = useState<string>('');
+  const [savingColor, setSavingColor] = useState(false);
 
   // ── Metricool state ─────────────────────────────────────────────────────────
   const [metricoolOpen, setMetricoolOpen] = useState(false);
@@ -184,11 +223,28 @@ export default function Editor() {
       const url   = await generateStoryImage(brief, currentFormat.aspectRatio);
       setImageUrl(url);
       setImageGenFormat(selectedFormat);
+      // استخراج الألوان السائدة من الصورة المولَّدة
+      const colors = await extractDominantColors(url);
+      setExtractedColors(colors);
+      setSelectedExtractedColor('');
     } catch (error) {
       console.error("Image generation failed", error);
       setImageError("Visual generation failed. You can try again or use a fallback image.");
     } finally {
       setImageGenerating(false);
+    }
+  };
+
+  const handleSaveColor = async (color: string) => {
+    setSavingColor(true);
+    try {
+      await setDoc(doc(db, 'settings', 'brand'), { defaultAccentColor: color }, { merge: true });
+      setBrandSettings(prev => prev ? { ...prev, defaultAccentColor: color } : prev);
+      setSelectedExtractedColor(color);
+    } catch (err) {
+      console.error('Failed to save accent color', err);
+    } finally {
+      setSavingColor(false);
     }
   };
 
@@ -683,6 +739,39 @@ export default function Editor() {
               {imageGenerating ? <Loader2 className="animate-spin" size={14} /> : <ImageIcon size={14} />}
               Regenerate Theme Visual
             </button>
+
+            {/* ── Color Palette extracted from generated image ── */}
+            {extractedColors.length > 0 && (
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                <p className="text-[9px] uppercase tracking-widest text-white/40">
+                  Extracted Colors — tap to save as brand accent
+                </p>
+                <div className="flex gap-2 flex-wrap items-center">
+                  {extractedColors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => handleSaveColor(color)}
+                      title={`Save ${color} as accent color`}
+                      disabled={savingColor}
+                      className={`w-8 h-8 rounded-full border-2 transition-all disabled:opacity-50 ${
+                        selectedExtractedColor === color
+                          ? 'border-white scale-110 shadow-lg shadow-black/40'
+                          : 'border-transparent hover:border-white/60 hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                {selectedExtractedColor && (
+                  <p className="text-[9px] text-white/30 flex items-center gap-1">
+                    {savingColor
+                      ? <><Loader2 size={9} className="animate-spin" /> Saving…</>
+                      : <>✓ Saved <span style={{ color: selectedExtractedColor }}>{selectedExtractedColor}</span> as accent</>
+                    }
+                  </p>
+                )}
+              </div>
+            )}
 
             {imageError && (
               <div className="p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-red-400 text-[10px] flex items-center gap-2">
