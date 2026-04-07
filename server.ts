@@ -833,9 +833,15 @@ async function startServer() {
       }));
 
       // publicationDate: DateTimeInfo
-      const pubDate = scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 2 * 60 * 1000);
+      // Server runs in UTC — must convert to Dubai time (UTC+4) before sending,
+      // because Metricool interprets the dateTime value in the specified timezone.
+      const DUBAI_OFFSET_MS = 4 * 60 * 60 * 1000; // UTC+4
+      const pubDate = scheduledAt
+        ? new Date(scheduledAt)
+        : new Date(Date.now() + 5 * 60 * 1000); // 5 min from now
+      const dubaiDate = new Date(pubDate.getTime() + DUBAI_OFFSET_MS);
       const pad = (n: number) => String(n).padStart(2, '0');
-      const dateTimeStr = `${pubDate.getFullYear()}-${pad(pubDate.getMonth() + 1)}-${pad(pubDate.getDate())}T${pad(pubDate.getHours())}:${pad(pubDate.getMinutes())}:00`;
+      const dateTimeStr = `${dubaiDate.getUTCFullYear()}-${pad(dubaiDate.getUTCMonth() + 1)}-${pad(dubaiDate.getUTCDate())}T${pad(dubaiDate.getUTCHours())}:${pad(dubaiDate.getUTCMinutes())}:00`;
 
       const payload = {
         text: caption,
