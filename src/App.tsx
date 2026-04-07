@@ -14,7 +14,6 @@ import BrandSettings from './pages/BrandSettings';
 import CompanySettings from './pages/CompanySettings';
 import Publish from './pages/Publish';
 import AuditLogs from './pages/AuditLogs';
-import Calendar from './pages/Calendar';
 import TwoFactorSetup from './pages/TwoFactorSetup';
 import Login from './pages/Login';
 
@@ -67,7 +66,6 @@ export default function App() {
           <Route path="news" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><NewsFeed /></ProtectedRoute>} />
           <Route path="editor/:articleId?" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><Editor /></ProtectedRoute>} />
           <Route path="archive" element={<Archive />} />
-          <Route path="calendar" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><Calendar /></ProtectedRoute>} />
           <Route path="brand" element={<ProtectedRoute allowedRoles={['admin', 'super-admin']}><BrandSettings /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute allowedRoles={['admin', 'super-admin']}><CompanySettings /></ProtectedRoute>} />
           <Route path="publish/:storyId" element={<ProtectedRoute allowedRoles={['senior-editor', 'admin', 'super-admin']}><Publish /></ProtectedRoute>} />

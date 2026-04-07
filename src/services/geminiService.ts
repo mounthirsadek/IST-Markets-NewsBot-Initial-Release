@@ -178,14 +178,25 @@ Return ONLY valid JSON. Example: {"subjectName":"GOLD","mainElement":"shiny gold
   }
 
   // Step 2: Build the IST Markets branded template prompt
-  const moodMap: Record<string, string> = {
-    bullish: 'optimistic, energetic, upward momentum, green glowing accents',
-    bearish: 'tense, dramatic, downward pressure, red glowing accents',
-    neutral: 'professional, analytical, balanced, silver and white accents',
+  const accentMap: Record<string, string> = {
+    bullish: 'emerald green',
+    bearish: 'crimson red',
+    neutral: 'silver white',
   };
-  const mood = moodMap[sentiment] ?? moodMap.neutral;
+  const moodMap: Record<string, string> = {
+    bullish: 'optimistic, energetic, upward momentum',
+    bearish: 'tense, dramatic, downward pressure',
+    neutral: 'professional, analytical, balanced',
+  };
+  const accent = accentMap[sentiment] ?? accentMap.neutral;
+  const mood   = moodMap[sentiment]  ?? moodMap.neutral;
 
-  return `A professional financial advertisement poster. Vibrant deep purple gradient background (#3d0066 to #150033). In the center foreground: a cinematic 3D rendered composition of ${mainElement} leaning against large bold 3D metallic silver letters spelling "${subjectName}". The ${mainElement} has subtle purple reflective lighting. Background features elegant thin white abstract wave lines and floating light particles. Overall mood: ${mood}. Studio-quality lighting, sharp shadows, cinematic depth of field, 8K resolution, minimalist corporate luxury style. Photorealistic render. No captions, no overlaid text, no news headlines — only the 3D composition.`;
+  return `A professional financial advertisement poster for IST Markets brand.
+BACKGROUND: deep royal purple gradient — dark violet #150033 at the edges blending to rich purple #3d0066 in the center. The background MUST remain purple throughout. No green, no red, no blue backgrounds.
+FOREGROUND: cinematic 3D rendered composition of ${mainElement} leaning against large bold 3D metallic silver letters spelling "${subjectName}". The ${mainElement} has subtle ${accent} rim lighting and small ${accent} glowing particles around it.
+DECORATIVE: elegant thin white abstract wave lines and floating light particles on the purple background.
+MOOD: ${mood}.
+STYLE: Studio-quality lighting, sharp shadows, cinematic depth of field, 8K resolution, minimalist corporate luxury style. Photorealistic render. No captions, no overlaid text, no news headlines — only the 3D composition.`;
 };
 
 // Valid aspect ratios supported by Imagen 4
