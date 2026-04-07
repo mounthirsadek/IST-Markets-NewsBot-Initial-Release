@@ -672,6 +672,18 @@ async function startServer() {
   });
 
   // Audit Logs Endpoint
+  // Stories Archive Endpoint
+  app.get("/api/stories", checkAuth, async (req: any, res: any) => {
+    try {
+      const db = req.db as FirestoreREST;
+      const stories = await db.query('stories', [], 'createdAt', 200);
+      res.json(stories);
+    } catch (error: any) {
+      console.error('[/api/stories]', error?.response?.data || error.message);
+      res.status(500).json({ error: "Failed to fetch stories" });
+    }
+  });
+
   app.get("/api/audit-logs", checkAuth, checkRole(['admin', 'super-admin']), async (req: any, res: any) => {
     try {
       const db = req.db as FirestoreREST;

@@ -5,9 +5,7 @@ import {
   CheckCircle2, Clock, Send, Hash, Globe, FileText,
   ChevronDown, ChevronUp, Copy, Check, PenTool
 } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuthStore } from '../store';
+import { auth } from '../firebase';
 import { Link } from 'react-router-dom';
 
 interface Story {
@@ -324,20 +322,32 @@ export default function Archive() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('all');
   const [formatFilter, setFormatFilter] = useState('all');
-  const { user } = useAuthStore();
 
   useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'stories'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, snap => {
-      setStories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Story)));
-      setLoading(false);
-    }, err => {
-      console.error('Archive listener:', err);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [user]);
+    const fetchStories = async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) { setLoading(false); return; }
+        const res = await fetch('/api/stories', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        // Sort by createdAt descending
+        const sorted = (Array.isArray(data) ? data : []).sort((a: any, b: any) => {
+          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tb - ta;
+        });
+        setStories(sorted);
+      } catch (err) {
+        console.error('Archive fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStories();
+  }, []);
 
   const formats = Array.from(new Set(stories.map(s => s.format).filter(Boolean))) as string[];
 
