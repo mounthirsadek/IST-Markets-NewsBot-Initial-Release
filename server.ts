@@ -827,13 +827,14 @@ async function startServer() {
         return res.status(400).json({ error: 'Missing required fields: blogId, networks, imageUrl, caption' });
       }
 
-      // Map network names to ProviderStatus objects
-      const providers = (networks as string[]).map((network: string) => ({ network }));
+      // Map network names to ProviderStatus objects (Metricool expects uppercase)
+      const providers = (networks as string[]).map((network: string) => ({
+        network: network.toUpperCase()
+      }));
 
-      // publicationDate: DateTimeInfo — use brand timezone Asia/Dubai or provided scheduledAt
-      const pubDate = scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 60 * 1000);
+      // publicationDate: DateTimeInfo
+      const pubDate = scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 2 * 60 * 1000);
       const pad = (n: number) => String(n).padStart(2, '0');
-      // Format as local datetime string (API applies timezone separately)
       const dateTimeStr = `${pubDate.getFullYear()}-${pad(pubDate.getMonth() + 1)}-${pad(pubDate.getDate())}T${pad(pubDate.getHours())}:${pad(pubDate.getMinutes())}:00`;
 
       const payload = {
@@ -843,10 +844,12 @@ async function startServer() {
           timezone: 'Asia/Dubai',
         },
         providers,
-        media: [imageUrl],
+        media: [{ url: imageUrl }],
         autoPublish: true,
         targetBrandId: Number(blogId),
       };
+
+      console.log('Metricool payload:', JSON.stringify(payload, null, 2));
 
       const response = await axios.post(`${METRICOOL_BASE}/v2/scheduler/posts`, payload, {
         params: { userId: process.env.METRICOOL_USER_ID, blogId: Number(blogId) },
@@ -854,8 +857,11 @@ async function startServer() {
       });
       res.json({ success: true, data: response.data });
     } catch (error: any) {
-      console.error('Metricool schedule failed:', error.response?.data || error.message);
-      res.status(500).json({ error: error.response?.data?.message || error.message });
+      const detail = error.response?.data || error.message;
+      console.error('Metricool schedule failed:', JSON.stringify(detail));
+      res.status(500).json({
+        error: typeof detail === 'object' ? JSON.stringify(detail) : detail
+      });
     }
   });
 
