@@ -193,11 +193,28 @@ async function verifyIdToken(idToken: string): Promise<{ uid: string; email: str
   return { uid: user.localId, email: user.email, ...user };
 }
 
+// ── Temporary image store (for Metricool uploads) ────────────────────────────
+// Images are stored in memory for 30 minutes, then purged automatically.
+const tempImageStore = new Map<string, { buf: Buffer; mime: string; ts: number }>();
+setInterval(() => {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [k, v] of tempImageStore) if (v.ts < cutoff) tempImageStore.delete(k);
+}, 5 * 60 * 1000);
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '20mb' }));
+
+  // ── Serve temp images publicly (no auth — Metricool needs to fetch these) ──
+  app.get('/api/temp-image/:id', (req: any, res: any) => {
+    const img = tempImageStore.get(req.params.id);
+    if (!img) return res.status(404).send('Not found');
+    res.set('Content-Type', img.mime);
+    res.set('Cache-Control', 'public, max-age=1800');
+    res.send(img.buf);
+  });
 
   // RBAC Middleware
   const checkAuth = async (req: any, res: any, next: any) => {
@@ -238,7 +255,9 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // ─── Brand Asset Upload → Firebase Storage REST API ─────────────────────
+  // ─── Brand Asset Upload → in-memory temp store ───────────────────────────
+  // Stores image in memory for 30 min and returns a public URL on this server.
+  // Metricool (and any external service) can fetch the image without tokens.
   app.post("/api/upload-brand-asset", checkAuth, async (req: any, res: any) => {
     try {
       const { dataUrl } = req.body;
@@ -249,35 +268,16 @@ async function startServer() {
 
       const mimeType = matches[1];
       const buffer   = Buffer.from(matches[2], 'base64');
-      const ext      = mimeType.includes('png') ? 'png' : 'jpg';
-      const filename = `branded-visuals/${randomUUID()}.${ext}`;
+      const id       = randomUUID();
 
-      // Upload to Firebase Storage using user's idToken (no service account needed)
-      const storageBucket = process.env.FIREBASE_STORAGE_BUCKET
-        || `${FIRESTORE_PROJECT}.firebasestorage.app`;
-      const encodedName = encodeURIComponent(filename);
-      const uploadUrl   = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o?name=${encodedName}&uploadType=media`;
+      tempImageStore.set(id, { buf: buffer, mime: mimeType, ts: Date.now() });
 
-      const uploadRes = await axios.post(uploadUrl, buffer, {
-        headers: {
-          Authorization: `Bearer ${req.idToken}`,
-          'Content-Type': mimeType,
-        },
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-        timeout: 30000,
-      });
-
-      const downloadToken = uploadRes.data?.downloadTokens;
-      if (!downloadToken) throw new Error('Firebase Storage upload failed — no download token');
-
-      const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedName}?alt=media&token=${downloadToken}`;
-      res.json({ url: publicUrl });
+      const appUrl = process.env.APP_URL?.replace(/\/$/, '') || 'https://publisher.istmarkets.com';
+      res.json({ url: `${appUrl}/api/temp-image/${id}` });
 
     } catch (error: any) {
-      const detail = error.response?.data?.error?.message || error.message;
-      console.error("Brand asset upload failed:", detail);
-      res.status(500).json({ error: detail });
+      console.error("Brand asset upload failed:", error.message);
+      res.status(500).json({ error: error.message });
     }
   });
 
