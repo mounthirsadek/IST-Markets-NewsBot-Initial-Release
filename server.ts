@@ -850,7 +850,7 @@ async function startServer() {
           timezone: 'Asia/Dubai',
         },
         providers,
-        media: [{ url: imageUrl }],
+        media: [imageUrl],
         autoPublish: true,
         targetBrandId: Number(blogId),
       };

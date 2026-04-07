@@ -322,6 +322,7 @@ export default function Editor() {
     setMcError(null);
     try {
       const imageUrl = await uploadCanvasForMetricool(canvasDataUrl);
+      console.log('[Metricool] Image URL:', imageUrl);
       await scheduleToMetricool({
         blogId: mcSelectedBrand.id,
         networks: mcSelectedNetworks,
