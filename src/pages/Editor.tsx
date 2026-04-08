@@ -408,7 +408,7 @@ export default function Editor() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
+    <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -432,7 +432,7 @@ export default function Editor() {
           <button
             onClick={openMetricool}
             disabled={!enBrandedUrl && !arBrandedUrl}
-            className="px-6 py-2 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 font-bold text-purple-300 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="hidden md:flex px-6 py-2 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 font-bold text-purple-300 transition-all items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Radio size={18} />
             Send to Metricool
@@ -735,10 +735,10 @@ export default function Editor() {
               )}
             </div>
 
-            <button 
+            <button
               onClick={handleGenerateImage}
               disabled={imageGenerating || !enHeadline}
-              className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-all disabled:opacity-50"
+              className="hidden md:flex w-full py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-bold items-center justify-center gap-2 hover:bg-white/10 transition-all disabled:opacity-50"
             >
               {imageGenerating ? <Loader2 className="animate-spin" size={14} /> : <ImageIcon size={14} />}
               Regenerate Theme Visual
@@ -957,6 +957,41 @@ export default function Editor() {
           </div>
         </div>
       )}
+
+      {/* ── Mobile Fixed Bottom Actions ─────────────────────────────────────── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0a0a0a]/95 backdrop-blur-sm border-t border-white/10 px-4 py-3">
+        <div className="flex gap-2">
+          {/* Generate AI Story */}
+          <button
+            onClick={() => handleRewrite('all')}
+            disabled={generating}
+            className="flex-1 py-3 rounded-xl bg-[#f27d26] text-black text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
+          >
+            {generating ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+            Generate
+          </button>
+
+          {/* Regenerate Theme Visual */}
+          <button
+            onClick={handleGenerateImage}
+            disabled={imageGenerating || !enHeadline}
+            className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 active:scale-95 transition-transform"
+          >
+            {imageGenerating ? <Loader2 className="animate-spin" size={14} /> : <ImageIcon size={14} />}
+            Visual
+          </button>
+
+          {/* Send to Metricool */}
+          <button
+            onClick={openMetricool}
+            disabled={!enBrandedUrl && !arBrandedUrl}
+            className="flex-1 py-3 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 active:scale-95 transition-transform"
+          >
+            <Radio size={14} />
+            Metricool
+          </button>
+        </div>
+      </div>
 
       {/* Full-size Image Preview Modal */}
       {previewModal && (
