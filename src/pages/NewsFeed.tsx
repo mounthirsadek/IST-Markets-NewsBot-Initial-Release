@@ -327,10 +327,10 @@ export default function NewsFeed() {
       )}
 
       {/* ── Filter Bar ─────────────────────────────────────────────── */}
-      <div className="glass rounded-xl border border-white/5 p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Label */}
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40 font-bold shrink-0">
+      <div className="glass rounded-xl border border-white/5 p-3 md:p-4">
+        {/* Header row: label + count */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40 font-bold">
             <Filter size={13} className="text-[#f27d26]" />
             Filter
             {activeFilterCount > 0 && (
@@ -339,39 +339,43 @@ export default function NewsFeed() {
               </span>
             )}
           </div>
+          <span className="text-[10px] text-white/30">
+            {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''}
+          </span>
+        </div>
 
-          <div className="w-px h-5 bg-white/10 shrink-0" />
-
+        {/* Filters grid: 1 col mobile → 2 col sm → 4 col lg */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {/* Keyword Search */}
-          <div className="relative flex-1 min-w-0 max-w-full sm:max-w-[240px]">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={14} />
             <input
               type="text"
               placeholder="Keyword search..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#f27d26] transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2.5 text-xs focus:outline-none focus:border-[#f27d26] transition-colors"
             />
           </div>
 
           {/* Date Filter */}
-          <div className="relative flex items-center gap-2 flex-1 min-w-0 sm:min-w-[150px] sm:flex-none">
+          <div className="relative flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5">
             <CalendarDays size={14} className="text-white/30 shrink-0" />
             <input
               type="date"
               value={filterDate}
               onChange={e => setFilterDate(e.target.value)}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#f27d26] transition-colors text-white/80 [color-scheme:dark]"
+              className="flex-1 bg-transparent text-xs focus:outline-none text-white/80 [color-scheme:dark] min-w-0"
             />
           </div>
 
           {/* Theme Filter */}
-          <div className="relative flex items-center gap-2 flex-1 min-w-0 sm:min-w-[150px] sm:flex-none">
+          <div className="relative flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5">
             <Tag size={14} className="text-white/30 shrink-0" />
             <select
               value={filterTheme}
               onChange={e => setFilterTheme(e.target.value)}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#f27d26] transition-colors text-white/80"
+              className="flex-1 bg-transparent text-xs focus:outline-none text-white/80 min-w-0"
             >
               <option value="">All Themes</option>
               {allThemes.map(t => <option key={t} value={t}>{t}</option>)}
@@ -379,34 +383,31 @@ export default function NewsFeed() {
           </div>
 
           {/* Source Filter */}
-          <div className="relative flex items-center gap-2 flex-1 min-w-0 sm:min-w-[160px] sm:flex-none">
+          <div className="relative flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5">
             <Globe size={14} className="text-white/30 shrink-0" />
             <select
               value={filterSource}
               onChange={e => setFilterSource(e.target.value)}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#f27d26] transition-colors text-white/80"
+              className="flex-1 bg-transparent text-xs focus:outline-none text-white/80 min-w-0"
             >
               <option value="">All Sources</option>
               {allSources.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+        </div>
 
-          {/* Clear Filters */}
-          {activeFilterCount > 0 && (
+        {/* Clear button */}
+        {activeFilterCount > 0 && (
+          <div className="mt-2 flex justify-end">
             <button
               onClick={clearFilters}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 hover:bg-red-400/10 border border-white/10 hover:border-red-400/20 text-white/40 hover:text-red-400 transition-all text-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-400/10 border border-white/10 hover:border-red-400/20 text-white/40 hover:text-red-400 transition-all text-xs"
             >
               <X size={13} />
-              Clear
+              Clear filters
             </button>
-          )}
-
-          {/* Results count */}
-          <span className="ml-auto text-[10px] text-white/30 shrink-0">
-            {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''}
-          </span>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Trending Assets */}
