@@ -61,20 +61,20 @@ export default function AuditLogs() {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div>
           <h2 className="text-4xl font-bold tracking-tighter">Audit Trail</h2>
           <p className="text-white/40 uppercase tracking-widest text-xs mt-1">System Traceability & Event Logs</p>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
-            <select 
+            <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] transition-colors appearance-none w-48"
+              className="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] transition-colors appearance-none w-full sm:w-48"
             >
               {actionTypes.map(type => (
                 <option key={type} value={type} className="bg-[#1a1a1a]">{type}</option>
@@ -84,12 +84,12 @@ export default function AuditLogs() {
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
-            <input 
-              type="text" 
-              placeholder="Filter logs..." 
+            <input
+              type="text"
+              placeholder="Filter logs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] transition-colors w-64"
+              className="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] transition-colors w-full sm:w-64"
             />
           </div>
         </div>

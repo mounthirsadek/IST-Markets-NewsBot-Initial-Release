@@ -96,7 +96,7 @@ export default function Login() {
   };
 
   return (
-    <div className="h-screen w-full flex items-center justify-center bg-[#0a0a0a] overflow-hidden relative">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0a0a] overflow-hidden relative px-4 py-8">
       {/* Background Atmosphere */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#f27d26]/10 blur-[120px] rounded-full" />
@@ -110,7 +110,7 @@ export default function Login() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="glass p-12 rounded-2xl w-full max-w-md text-center relative z-10"
+            className="glass p-6 md:p-12 rounded-2xl w-full max-w-md text-center relative z-10"
           >
             <h1 className="text-4xl font-bold tracking-tighter mb-2 text-[#f27d26]">IST MARKETS</h1>
             <p className="text-white/60 mb-8 uppercase tracking-widest text-xs">News Automation Platform</p>
@@ -153,7 +153,7 @@ export default function Login() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="glass p-12 rounded-2xl w-full max-w-md text-center relative z-10 space-y-8"
+            className="glass p-6 md:p-12 rounded-2xl w-full max-w-md text-center relative z-10 space-y-8"
           >
             <div className="w-16 h-16 bg-blue-400/10 rounded-full flex items-center justify-center mx-auto text-blue-400">
               <Smartphone size={32} />
@@ -170,7 +170,7 @@ export default function Login() {
                 placeholder="000000"
                 value={token}
                 onChange={(e) => setToken(e.target.value.replace(/\D/g, ''))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-center text-3xl font-mono tracking-[0.5em] focus:outline-none focus:border-[#f27d26] transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-center text-xl md:text-3xl font-mono tracking-[0.3em] md:tracking-[0.5em] focus:outline-none focus:border-[#f27d26] transition-colors"
               />
               {error && (
                 <div className="flex items-center gap-2 text-red-400 text-xs justify-center">

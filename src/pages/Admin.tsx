@@ -76,22 +76,22 @@ export default function Admin() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div>
           <h2 className="text-4xl font-bold tracking-tighter">User Management</h2>
           <p className="text-white/40 uppercase tracking-widest text-xs mt-1">Access Control & Security Policies</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search users..." 
+            <input
+              type="text"
+              placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] transition-colors w-64"
+              className="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] transition-colors w-full sm:w-64"
             />
           </div>
           
@@ -115,8 +115,8 @@ export default function Admin() {
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#f27d26]"></div>
         </div>
       ) : (
-        <div className="glass rounded-2xl border-white/5 overflow-hidden">
-          <table className="w-full text-left border-collapse">
+        <div className="glass rounded-2xl border-white/5 overflow-hidden overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.02]">
                 <th className="p-4 text-[10px] uppercase tracking-widest text-white/40 font-bold">User</th>

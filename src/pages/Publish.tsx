@@ -186,19 +186,19 @@ ${links}
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
-      <header className="flex items-center justify-between">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/5 rounded-lg transition-colors shrink-0">
             <ChevronLeft size={24} />
           </button>
           <div>
-            <h2 className="text-4xl font-bold tracking-tighter">Final Review & Publish</h2>
+            <h2 className="text-2xl md:text-4xl font-bold tracking-tighter">Final Review & Publish</h2>
             <p className="text-white/40 uppercase tracking-widest text-xs mt-1">Social Packaging & Distribution</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
             <Calendar size={18} className="text-white/40" />
             <input 

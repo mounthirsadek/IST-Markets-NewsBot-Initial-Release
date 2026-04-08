@@ -247,15 +247,15 @@ export default function NewsFeed() {
   ).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div>
-          <h2 className="text-4xl font-bold tracking-tighter">News Review</h2>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tighter">News Review</h2>
           <p className="text-white/40 uppercase tracking-widest text-xs mt-1">Review and Select Market Intelligence</p>
         </div>
-        
-        <div className="flex items-center gap-4">
+
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           {selectedIds.size > 0 && (
             <button 
               onClick={() => navigate(`/editor/${Array.from(selectedIds)[0]}`)}
@@ -343,7 +343,7 @@ export default function NewsFeed() {
           <div className="w-px h-5 bg-white/10 shrink-0" />
 
           {/* Keyword Search */}
-          <div className="relative flex-1 min-w-[160px] max-w-[240px]">
+          <div className="relative flex-1 min-w-0 max-w-full sm:max-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={14} />
             <input
               type="text"
@@ -355,7 +355,7 @@ export default function NewsFeed() {
           </div>
 
           {/* Date Filter */}
-          <div className="relative flex items-center gap-2 min-w-[160px]">
+          <div className="relative flex items-center gap-2 flex-1 min-w-0 sm:min-w-[150px] sm:flex-none">
             <CalendarDays size={14} className="text-white/30 shrink-0" />
             <input
               type="date"
@@ -366,7 +366,7 @@ export default function NewsFeed() {
           </div>
 
           {/* Theme Filter */}
-          <div className="relative flex items-center gap-2 min-w-[160px]">
+          <div className="relative flex items-center gap-2 flex-1 min-w-0 sm:min-w-[150px] sm:flex-none">
             <Tag size={14} className="text-white/30 shrink-0" />
             <select
               value={filterTheme}
@@ -379,7 +379,7 @@ export default function NewsFeed() {
           </div>
 
           {/* Source Filter */}
-          <div className="relative flex items-center gap-2 min-w-[180px]">
+          <div className="relative flex items-center gap-2 flex-1 min-w-0 sm:min-w-[160px] sm:flex-none">
             <Globe size={14} className="text-white/30 shrink-0" />
             <select
               value={filterSource}

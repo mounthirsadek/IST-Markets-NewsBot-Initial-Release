@@ -292,7 +292,7 @@ function StoryCard({ story }: { story: Story }) {
               )}
 
               {/* Meta */}
-              <div className="grid grid-cols-3 gap-4 pt-3 border-t border-white/5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 pt-3 border-t border-white/5">
                 <div>
                   <p className="text-[8px] uppercase tracking-widest text-white/20 mb-0.5">Format</p>
                   <p className="text-xs font-bold">{FORMAT_LABELS[story.format || ''] || story.format || '—'}</p>
@@ -369,7 +369,7 @@ export default function Archive() {
   const drafts    = stories.filter(s => s.status === 'draft').length;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 md:space-y-8">
 
       {/* Header */}
       <header className="space-y-6">
@@ -385,13 +385,13 @@ export default function Archive() {
               placeholder="Search headlines or captions…"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#f27d26] transition-colors w-72"
+              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#f27d26] transition-colors w-full sm:w-72"
             />
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[
             { label: 'Total',     value: total,     color: 'text-white' },
             { label: 'Published', value: published, color: 'text-emerald-400' },

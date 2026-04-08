@@ -408,20 +408,20 @@ export default function Editor() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
       {/* Header */}
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/5 rounded-lg transition-colors shrink-0">
             <ChevronLeft size={24} />
           </button>
           <div>
-            <h2 className="text-4xl font-bold tracking-tighter">Editorial Review</h2>
+            <h2 className="text-2xl md:text-4xl font-bold tracking-tighter">Editorial Review</h2>
             <p className="text-white/40 uppercase tracking-widest text-xs mt-1">Review, Edit & Regenerate</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <button
             onClick={() => handleSave('draft')}
             className="px-6 py-2 rounded-lg bg-white/5 hover:bg-white/10 font-bold transition-all flex items-center gap-2"

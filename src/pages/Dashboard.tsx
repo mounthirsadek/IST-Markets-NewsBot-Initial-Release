@@ -87,16 +87,16 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-12">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 md:space-y-12">
       {/* Header */}
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
-          <h2 className="text-4xl font-bold tracking-tighter">Dashboard</h2>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tighter">Dashboard</h2>
           <p className="text-white/40 uppercase tracking-widest text-xs mt-1">System Overview & Analytics</p>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-mono text-[#f27d26]">{new Date().toLocaleDateString()}</p>
-          <div className="flex items-center gap-4 justify-end mt-1">
+        <div className="sm:text-right">
+          <p className="text-xl md:text-2xl font-mono text-[#f27d26]">{new Date().toLocaleDateString()}</p>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end mt-1">
             {Object.entries(health).map(([service, status]) => (
               <div key={service} className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${
@@ -118,7 +118,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
-            className="glass p-8 rounded-2xl border-white/5 relative overflow-hidden group"
+            className="glass p-4 md:p-8 rounded-2xl border-white/5 relative overflow-hidden group"
           >
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
               <stat.icon size={80} />

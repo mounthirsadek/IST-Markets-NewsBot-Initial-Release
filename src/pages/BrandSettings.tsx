@@ -156,8 +156,8 @@ export default function BrandSettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      <header className="flex items-center justify-between">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-4xl font-bold tracking-tighter">Brand Identity</h2>
           <p className="text-white/40 uppercase tracking-widest text-xs mt-1">Configure your visual DNA</p>
@@ -182,7 +182,7 @@ export default function BrandSettingsPage() {
               <h3 className="font-bold uppercase tracking-widest text-sm">Logo & Assets</h3>
             </div>
             
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest text-white/40">Company Logo</label>
                 <div className="flex items-center gap-4">
