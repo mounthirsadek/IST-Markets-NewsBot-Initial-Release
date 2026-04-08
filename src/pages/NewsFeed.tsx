@@ -540,92 +540,95 @@ export default function NewsFeed() {
             </div>
           ) : (
             filteredArticles.map((article, idx) => (
-              <motion.div 
+              <motion.div
                 key={article.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="glass p-6 rounded-xl border-white/5 flex gap-6 hover:bg-white/5 transition-colors group relative"
+                className="glass p-4 md:p-6 rounded-xl border-white/5 hover:bg-white/5 transition-colors group relative space-y-3"
               >
-                {/* Select Checkbox */}
-                <div className="pt-1">
-                  <button 
+                {/* ── Row 1: Checkbox + Badges ──────────────────── */}
+                <div className="flex items-start gap-3">
+                  {/* Checkbox */}
+                  <button
                     onClick={() => toggleSelect(article.id)}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                      selectedIds.has(article.id) 
-                      ? "bg-[#f27d26] border-[#f27d26]" 
-                      : "border-white/20 hover:border-white/40"
+                    className={`mt-0.5 w-5 h-5 md:w-6 md:h-6 rounded border-2 shrink-0 flex items-center justify-center transition-all ${
+                      selectedIds.has(article.id)
+                        ? 'bg-[#f27d26] border-[#f27d26]'
+                        : 'border-white/20 hover:border-white/40'
                     }`}
                   >
-                    {selectedIds.has(article.id) && <CheckCircle2 size={16} className="text-black" />}
+                    {selectedIds.has(article.id) && <CheckCircle2 size={14} className="text-black" />}
                   </button>
-                </div>
 
-                <div className="flex-1 space-y-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 bg-[#f27d26]/20 text-[#f27d26] rounded font-bold">
+                  {/* Badges row */}
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 bg-[#f27d26]/20 text-[#f27d26] rounded font-bold whitespace-nowrap">
                       {article.theme}
                     </span>
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 bg-white/10 rounded font-bold text-white/60">
+                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 bg-white/10 rounded font-bold text-white/60 whitespace-nowrap">
                       {article.source_name}
                     </span>
-                    <span className="text-[10px] uppercase tracking-widest text-white/40">
-                      {new Date(article.published_at_source).toLocaleString()}
-                    </span>
-                    
-                    {/* Safety Status Badge */}
-                    <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded font-bold ${
-                      article.safety_status === 'safe' ? 'bg-green-500/20 text-green-400' :
+                    <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded font-bold whitespace-nowrap ${
+                      article.safety_status === 'safe'        ? 'bg-green-500/20 text-green-400' :
                       article.safety_status === 'conditional' ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
+                                                                'bg-red-500/20 text-red-400'
                     }`}>
                       {article.safety_status}
                     </span>
+                    <span className="text-[10px] text-white/30 whitespace-nowrap">
+                      {new Date(article.published_at_source).toLocaleString()}
+                    </span>
                   </div>
+                </div>
 
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-bold leading-tight group-hover:text-[#f27d26] transition-colors">
-                      {article.headline}
-                    </h3>
-                    <p className="text-sm text-white/60 line-clamp-2">
-                      {article.article_body}
-                    </p>
-                  </div>
+                {/* ── Row 2: Headline + Body ────────────────────── */}
+                <div className="space-y-1.5 pl-8 md:pl-9">
+                  <h3 className="text-base md:text-xl font-bold leading-snug group-hover:text-[#f27d26] transition-colors">
+                    {article.headline}
+                  </h3>
+                  <p className="text-sm text-white/50 line-clamp-2 leading-relaxed">
+                    {article.article_body}
+                  </p>
+                </div>
 
-                  {/* Asset Tags */}
-                  <div className="flex flex-wrap gap-2">
+                {/* ── Row 3: Asset Tags + Actions ───────────────── */}
+                <div className="pl-8 md:pl-9 flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-white/5">
+                  {/* Asset tags */}
+                  <div className="flex flex-wrap gap-1.5">
                     {article.asset_tags.map(tag => (
                       <span key={tag} className="text-[9px] px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-white/40">
                         ${tag}
                       </span>
                     ))}
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <a 
-                    href={article.article_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white"
-                    title="View Original"
-                  >
-                    <ExternalLink size={20} />
-                  </a>
-                  <button 
-                    onClick={() => updateStatus(article.id, 'rejected')}
-                    className="p-3 rounded-lg bg-white/5 hover:bg-red-400/10 transition-colors text-white/60 hover:text-red-400"
-                    title="Reject"
-                  >
-                    <XCircle size={20} />
-                  </button>
-                  <Link 
-                    to={`/editor/${article.id}`}
-                    className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[#f27d26]/10 text-[#f27d26] hover:bg-[#f27d26] hover:text-black font-bold transition-all"
-                  >
-                    <PenTool size={20} />
-                    <span>Rewrite</span>
-                  </Link>
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    <a
+                      href={article.article_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 md:p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+                      title="View Original"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                    <button
+                      onClick={() => updateStatus(article.id, 'rejected')}
+                      className="p-2 md:p-3 rounded-lg bg-white/5 hover:bg-red-400/10 transition-colors text-white/60 hover:text-red-400"
+                      title="Reject"
+                    >
+                      <XCircle size={16} />
+                    </button>
+                    <Link
+                      to={`/editor/${article.id}`}
+                      className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-3 rounded-lg bg-[#f27d26]/10 text-[#f27d26] hover:bg-[#f27d26] hover:text-black font-bold transition-all text-sm"
+                    >
+                      <PenTool size={16} />
+                      <span>Rewrite</span>
+                    </Link>
+                  </div>
                 </div>
               </motion.div>
             ))
