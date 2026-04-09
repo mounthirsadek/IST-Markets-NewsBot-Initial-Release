@@ -629,6 +629,13 @@ export default function NewsFeed() {
                       <PenTool size={16} />
                       <span>Rewrite</span>
                     </Link>
+                    <Link
+                      to={`/hooks/${article.id}`}
+                      className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/20 font-bold transition-all text-sm"
+                    >
+                      <Zap size={16} />
+                      <span>Hook It</span>
+                    </Link>
                   </div>
                 </div>
               </motion.div>

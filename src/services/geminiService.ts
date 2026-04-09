@@ -222,6 +222,66 @@ export const generateStoryImage = async (brief: string, aspectRatio = '1:1'): Pr
   throw new Error("Failed to generate image");
 };
 
+export const generateHookContent = async (
+  articleTitle: string,
+  articleContent: string
+): Promise<StoryContent> => {
+  const prompt = `You are a viral financial markets content writer specializing in hook-based social media posts that drive massive engagement.
+
+Article Title: ${articleTitle}
+Article Content: ${articleContent}
+
+Write TWO viral hook-based social media posts — one in English and one in Arabic.
+
+Use ONE of these psychological hook frameworks per post:
+- FOMO Hook: "Everyone is talking about X but nobody is telling you Y..."
+- Curiosity Gap: "The reason [thing] happened will shock you..."
+- Authority Hook: "After analyzing 1000+ trades, here's what actually moves markets..."
+- Pattern Recognition: "Every time X happens, Y follows within Z days..."
+- Contrarian Hook: "While everyone is [doing X], smart money is quietly doing Y..."
+- Educational Value: "3 things your broker won't tell you about [topic]..."
+
+Rules:
+- English post: Max 2200 chars. Start with the hook. Use line breaks for readability. 3-5 relevant hashtags.
+- Arabic post: Max 2200 chars. Translate naturally with the same hook energy. 3-5 Arabic hashtags.
+- Headline: Short punchy hook title (max 15 words).
+- DO NOT use generic financial news language. Make it feel personal, urgent, and exciting.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          en: {
+            type: Type.OBJECT,
+            properties: {
+              headline: { type: Type.STRING },
+              caption: { type: Type.STRING },
+              hashtags: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["headline", "caption", "hashtags"]
+          },
+          ar: {
+            type: Type.OBJECT,
+            properties: {
+              headline: { type: Type.STRING },
+              caption: { type: Type.STRING },
+              hashtags: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["headline", "caption", "hashtags"]
+          }
+        },
+        required: ["en", "ar"]
+      }
+    }
+  });
+
+  return JSON.parse(response.text || '{}');
+};
+
 export interface SocialCaption {
   hook: string;
   summary: string;

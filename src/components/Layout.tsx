@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap } from 'lucide-react';
 import { auth, logout } from '../firebase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -14,6 +14,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: Newspaper, label: 'News Feed', path: '/news', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
   { icon: PenTool, label: 'Editor', path: '/editor', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
+  { icon: Zap, label: 'Hooks', path: '/hooks', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
   { icon: Archive, label: 'Archive', path: '/archive' },
   { icon: Palette, label: 'Brand Settings', path: '/brand', roles: ['admin', 'super-admin'] },
   { icon: Settings, label: 'Company Settings', path: '/settings', roles: ['admin', 'super-admin'] },
@@ -87,7 +88,7 @@ export default function Layout() {
 
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto py-2">
           {filteredNavItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
               <Link
                 key={item.path}
