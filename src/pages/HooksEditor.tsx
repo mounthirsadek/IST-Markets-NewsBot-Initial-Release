@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Zap, Image as ImageIcon, Save, Languages, ChevronLeft, Loader2, AlertCircle, Download, Maximize2, X, Radio, Search, RefreshCw } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, limit, doc, getDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -144,8 +144,6 @@ export default function HooksEditor() {
   const [mcError, setMcError] = useState<string | null>(null);
   const [mcSuccess, setMcSuccess] = useState(false);
 
-  const autoSelectedRef = useRef(false);
-
   // ── Load brand settings ─────────────────────────────────────────────────────
   useEffect(() => {
     const fetchBrand = async () => {
@@ -161,6 +159,22 @@ export default function HooksEditor() {
     fetchBrand();
   }, []);
 
+  // ── Directly fetch the article from URL param (same pattern as Editor) ──────
+  useEffect(() => {
+    if (!articleId) return;
+    const fetchTargetArticle = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'news', articleId));
+        if (docSnap.exists()) {
+          setSelectedArticle({ id: docSnap.id, ...docSnap.data() } as NewsArticle);
+        }
+      } catch (err) {
+        console.error('Failed to fetch target article', err);
+      }
+    };
+    fetchTargetArticle();
+  }, [articleId]);
+
   // ── Subscribe to news articles ──────────────────────────────────────────────
   useEffect(() => {
     const q = query(collection(db, 'news'), orderBy('published_at_source', 'desc'), limit(150));
@@ -173,17 +187,6 @@ export default function HooksEditor() {
     }, () => setArticlesLoading(false));
     return () => unsub();
   }, []);
-
-  // ── Auto-select article from URL param ─────────────────────────────────────
-  useEffect(() => {
-    if (articleId && articles.length > 0 && !autoSelectedRef.current) {
-      const found = articles.find(a => a.id === articleId);
-      if (found) {
-        setSelectedArticle(found);
-        autoSelectedRef.current = true;
-      }
-    }
-  }, [articleId, articles]);
 
   // ── Generate hook content ───────────────────────────────────────────────────
   const handleGenerate = async () => {
