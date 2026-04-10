@@ -107,7 +107,7 @@ export default function Editor() {
   const [imageUrl, setImageUrl] = useState('');
   const [enBrandedUrl, setEnBrandedUrl] = useState('');
   const [arBrandedUrl, setArBrandedUrl] = useState('');
-  const [selectedFormat, setSelectedFormat] = useState('ig-post');
+  const [selectedFormat, setSelectedFormat] = useState('ig-portrait');
   const [imageGenFormat, setImageGenFormat] = useState('');   // which format was used when generating
   const [originalArticle, setOriginalArticle] = useState<any>(null);
   const [versions, setVersions] = useState<any[]>([]);

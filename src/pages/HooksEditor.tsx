@@ -122,7 +122,7 @@ export default function HooksEditor() {
   const [imageUrl, setImageUrl] = useState('');
   const [enBrandedUrl, setEnBrandedUrl] = useState('');
   const [arBrandedUrl, setArBrandedUrl] = useState('');
-  const [selectedFormat, setSelectedFormat] = useState('ig-post');
+  const [selectedFormat, setSelectedFormat] = useState('ig-portrait');
   const [imageGenFormat, setImageGenFormat] = useState('');
   const [brandSettings, setBrandSettings] = useState<BrandSettings | null>(null);
   const [previewModal, setPreviewModal] = useState<string | null>(null);
