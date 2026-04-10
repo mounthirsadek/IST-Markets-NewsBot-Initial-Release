@@ -59,10 +59,11 @@ export default function NewsFeed() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSource, setSelectedSource] = useState('fmp');
-  const [filterDate, setFilterDate]     = useState('');
-  const [filterTheme, setFilterTheme]   = useState('');
-  const [filterSource, setFilterSource] = useState('');
-  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set());
+  const [filterDate, setFilterDate]       = useState('');
+  const [filterTheme, setFilterTheme]     = useState('');
+  const [filterSource, setFilterSource]   = useState('');
+  const [filterSymbol, setFilterSymbol]   = useState<string | null>(null);
+  const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualArticle, setManualArticle] = useState({
     headline: '',
@@ -202,13 +203,14 @@ export default function NewsFeed() {
   const allThemes  = useMemo(() => Array.from(new Set(articles.map(a => a.theme).filter(Boolean))).sort(), [articles]);
   const allSources = useMemo(() => Array.from(new Set(articles.map(a => a.source_name).filter(Boolean))).sort(), [articles]);
 
-  const activeFilterCount = [filterDate, filterTheme, filterSource, searchTerm].filter(Boolean).length;
+  const activeFilterCount = [filterDate, filterTheme, filterSource, searchTerm, filterSymbol].filter(Boolean).length;
 
   const clearFilters = () => {
     setFilterDate('');
     setFilterTheme('');
     setFilterSource('');
     setSearchTerm('');
+    setFilterSymbol(null);
   };
 
   const filteredArticles = articles.filter(a => {
@@ -237,6 +239,12 @@ export default function NewsFeed() {
 
     // Source filter
     if (filterSource && a.source_name !== filterSource) return false;
+
+    // Symbol filter (from trending bar click)
+    if (filterSymbol) {
+      const sym = MARKET_SYMBOLS.find(s => s.symbol === filterSymbol);
+      if (sym && !articleMentionsSymbol(a, sym)) return false;
+    }
 
     return true;
   }).sort((a, b) => {
@@ -438,16 +446,33 @@ export default function NewsFeed() {
         {trendingSymbols.length === 0 ? (
           <span className="text-[10px] text-white/20 italic">No trending data for this date</span>
         ) : (
-          trendingSymbols.map(({ sym, count }) => (
-            <div
-              key={sym.symbol}
-              className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono flex items-center gap-2 shrink-0 hover:bg-white/10 transition-colors cursor-default"
-              title={sym.name}
-            >
-              <span className={`font-bold ${CATEGORY_COLORS[sym.category]}`}>{sym.symbol}</span>
-              <span className="opacity-40">{count}</span>
-            </div>
-          ))
+          trendingSymbols.map(({ sym, count }) => {
+            const isSelected = filterSymbol === sym.symbol;
+            return (
+              <button
+                key={sym.symbol}
+                onClick={() => setFilterSymbol(isSelected ? null : sym.symbol)}
+                title={`${sym.name} — click to filter`}
+                className={`px-3 py-1 rounded-full text-[10px] font-mono flex items-center gap-2 shrink-0 transition-all active:scale-95 ${
+                  isSelected
+                    ? 'bg-white/20 border border-white/40 shadow-md'
+                    : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/25'
+                }`}
+              >
+                <span className={`font-bold ${CATEGORY_COLORS[sym.category]}`}>{sym.symbol}</span>
+                <span className={isSelected ? 'opacity-70' : 'opacity-40'}>{count}</span>
+                {isSelected && <X size={10} className="opacity-60" />}
+              </button>
+            );
+          })
+        )}
+        {filterSymbol && (
+          <button
+            onClick={() => setFilterSymbol(null)}
+            className="px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[9px] text-white/40 hover:text-white/70 hover:bg-white/10 transition-all shrink-0 flex items-center gap-1"
+          >
+            <X size={9} /> clear
+          </button>
         )}
       </div>
 
