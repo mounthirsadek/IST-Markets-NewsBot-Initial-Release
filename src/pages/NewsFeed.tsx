@@ -40,9 +40,14 @@ const RSS_SOURCES_UI = [
   { key: 'ecb',            label: 'ECB',                           category: 'Central Banks' },
   { key: 'bbc_ar',         label: 'BBC عربي — اقتصاد',           category: 'Arabic'        },
   { key: 'rt_ar',          label: 'RT عربي — اقتصاد',            category: 'Arabic'        },
+  { key: 'forexlive',      label: 'ForexLive',                    category: 'Forex News'    },
+  { key: 'fxstreet',       label: 'FXStreet',                     category: 'Forex News'    },
+  { key: 'dailyfx',        label: 'DailyFX',                      category: 'Forex News'    },
+  { key: 'nasdaq_news',    label: 'Nasdaq Markets News',           category: 'General'       },
+  { key: 'fxempire',       label: 'FX Empire',                    category: 'Forex News'    },
 ];
 
-const SOURCE_CATEGORIES = ['General', 'Energy', 'Crypto', 'Central Banks', 'Arabic'];
+const SOURCE_CATEGORIES = ['General', 'Forex News', 'Energy', 'Crypto', 'Central Banks', 'Arabic'];
 
 export default function NewsFeed() {
   const navigate = useNavigate();

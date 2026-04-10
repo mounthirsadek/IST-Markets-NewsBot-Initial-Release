@@ -379,6 +379,11 @@ async function startServer() {
     'ecb':           { label: 'ECB',                       url: 'https://www.ecb.europa.eu/rss/press.html',                                               category: 'Central Banks' },
     'bbc_ar':        { label: 'BBC عربي — اقتصاد',        url: 'https://feeds.bbci.co.uk/arabic/business/rss.xml',                                       category: 'Arabic'        },
     'rt_ar':         { label: 'RT عربي — اقتصاد',         url: 'https://arabic.rt.com/rss/business/',                                                    category: 'Arabic'        },
+    'forexlive':     { label: 'ForexLive',                 url: 'https://www.forexlive.com/feed/',                                                        category: 'Forex News'    },
+    'fxstreet':      { label: 'FXStreet',                  url: 'https://www.fxstreet.com/rss/news',                                                      category: 'Forex News'    },
+    'dailyfx':       { label: 'DailyFX',                   url: 'https://www.dailyfx.com/feeds/all',                                                      category: 'Forex News'    },
+    'nasdaq_news':   { label: 'Nasdaq Markets News',        url: 'https://www.nasdaq.com/feed/rssoutbound?category=Markets',                               category: 'General'       },
+    'fxempire':      { label: 'FX Empire',                 url: 'https://www.fxempire.com/api/v1/en/articles/rss',                                        category: 'Forex News'    },
   };
 
   const fetchRSSFeed = async (sourceKey: string): Promise<{ title: string; content: string; url: string; date: string; source: string }[]> => {
