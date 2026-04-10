@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap } from 'lucide-react';
+import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap, TrendingUp } from 'lucide-react';
 import { auth, logout } from '../firebase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -15,6 +15,7 @@ const navItems = [
   { icon: Newspaper, label: 'News Feed', path: '/news', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
   { icon: PenTool, label: 'Editor', path: '/editor', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
   { icon: Zap, label: 'Hooks', path: '/hooks', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
+  { icon: TrendingUp, label: 'Trending', path: '/trending' },
   { icon: Archive, label: 'Archive', path: '/archive' },
   { icon: Palette, label: 'Brand Settings', path: '/brand', roles: ['admin', 'super-admin'] },
   { icon: Settings, label: 'Company Settings', path: '/settings', roles: ['admin', 'super-admin'] },

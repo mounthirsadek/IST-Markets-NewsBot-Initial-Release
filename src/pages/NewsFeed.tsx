@@ -6,6 +6,7 @@ import { collection, query, orderBy, onSnapshot, updateDoc, doc, addDoc, serverT
 import { db } from '../firebase';
 import { useAuthStore } from '../store';
 import { fetchWithAuth } from '../lib/api';
+import { MARKET_SYMBOLS, articleMentionsSymbol, CATEGORY_COLORS } from '../data/symbols';
 
 interface NewsArticle {
   id: string;
@@ -239,12 +240,25 @@ export default function NewsFeed() {
     return db_ - da; // newest first
   });
 
-  const trendingAssets = Array.from(
-    articles.reduce((acc, article) => {
-      article.asset_tags?.forEach(tag => acc.set(tag, (acc.get(tag) || 0) + 1));
-      return acc;
-    }, new Map<string, number>())
-  ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  // Date-only base for trending (not affected by keyword/theme/source filters)
+  const trendingBaseArticles = useMemo(() =>
+    articles.filter(a => {
+      if (a.status === 'rejected') return false;
+      if (!filterDate) return true;
+      const day = a.published_at_source
+        ? new Date(a.published_at_source).toISOString().slice(0, 10) : '';
+      return day === filterDate;
+    }), [articles, filterDate]);
+
+  // Top 10 symbols from IST Markets instrument list
+  const trendingSymbols = useMemo(() => {
+    const counts = MARKET_SYMBOLS.map(sym => ({
+      sym,
+      count: trendingBaseArticles.filter(a => articleMentionsSymbol(a, sym)).length,
+    })).filter(x => x.count > 0);
+    counts.sort((a, b) => b.count - a.count);
+    return counts.slice(0, 10);
+  }, [trendingBaseArticles]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -410,21 +424,26 @@ export default function NewsFeed() {
         )}
       </div>
 
-      {/* Trending Assets */}
-      <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide">
+      {/* Trending Symbols */}
+      <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
         <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold shrink-0 flex items-center gap-2">
           <Sparkles size={14} className="text-[#f27d26]" />
-          Trending:
+          {filterDate ? `Trending · ${filterDate}` : 'Trending'}:
         </span>
-        {trendingAssets.map(([asset, count]) => (
-          <div 
-            key={asset}
-            className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono flex items-center gap-2 shrink-0"
-          >
-            <span className="text-[#f27d26] font-bold">{asset}</span>
-            <span className="opacity-40">{count}</span>
-          </div>
-        ))}
+        {trendingSymbols.length === 0 ? (
+          <span className="text-[10px] text-white/20 italic">No trending data for this date</span>
+        ) : (
+          trendingSymbols.map(({ sym, count }) => (
+            <div
+              key={sym.symbol}
+              className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono flex items-center gap-2 shrink-0 hover:bg-white/10 transition-colors cursor-default"
+              title={sym.name}
+            >
+              <span className={`font-bold ${CATEGORY_COLORS[sym.category]}`}>{sym.symbol}</span>
+              <span className="opacity-40">{count}</span>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Manual Entry Modal */}

@@ -17,6 +17,7 @@ import AuditLogs from './pages/AuditLogs';
 import TwoFactorSetup from './pages/TwoFactorSetup';
 import Login from './pages/Login';
 import HooksEditor from './pages/HooksEditor';
+import TrendingPage from './pages/TrendingPage';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
   const { user, role } = useAuthStore();
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="logs" element={<ProtectedRoute allowedRoles={['admin', 'super-admin']}><AuditLogs /></ProtectedRoute>} />
           <Route path="admin" element={<ProtectedRoute allowedRoles={['admin', 'super-admin']}><Admin /></ProtectedRoute>} />
           <Route path="hooks/:articleId?" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><HooksEditor /></ProtectedRoute>} />
+          <Route path="trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
           <Route path="security" element={<TwoFactorSetup />} />
         </Route>
       </Routes>
