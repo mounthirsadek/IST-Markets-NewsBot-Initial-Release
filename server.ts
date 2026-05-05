@@ -173,6 +173,10 @@ class FirestoreREST {
       throw e;
     }
   }
+
+  async deleteDoc(collection: string, docId: string): Promise<void> {
+    await axios.delete(`${FIRESTORE_BASE}/${collection}/${docId}`, { headers: this.headers() });
+  }
 }
 
 // ── Firebase Auth REST (token verification) ───────────────────────────────────
@@ -796,9 +800,6 @@ async function startServer() {
   // After first use the endpoint is effectively a no-op (role already set).
   app.post('/api/admin/bootstrap', checkAuth, async (req: any, res: any) => {
     const FIRST_ADMIN_EMAIL = process.env.FIRST_ADMIN_EMAIL || '';
-    if (!FIRST_ADMIN_EMAIL || req.user.email !== FIRST_ADMIN_EMAIL) {
-      return res.status(403).json({ error: 'Bootstrap not available for this account' });
-    }
     try {
       const db = req.db as FirestoreREST;
       // Check if document already exists and already has a role
@@ -808,15 +809,16 @@ async function startServer() {
         return res.json({ success: true, role: 'super-admin', message: 'Already super-admin' });
       }
       // Create/update own document — Firestore rules allow: allow create: if isAuthenticated() && isOwner(uid)
+      const assignedRole = req.user.email === FIRST_ADMIN_EMAIL ? 'super-admin' : 'viewer';
       await db.setDoc('users', req.user.uid, {
         uid:        req.user.uid,
         email:      req.user.email,
-        name:       req.user.displayName || req.user.email?.split('@')[0] || 'Admin',
-        role:       'super-admin',
+        name:       req.user.displayName || req.user.email?.split('@')[0] || 'User',
+        role:       assignedRole,
         created_at: new Date().toISOString(),
       });
-      console.log(`[Bootstrap] ${req.user.email} → super-admin`);
-      res.json({ success: true, role: 'super-admin', message: `${req.user.email} is now super-admin` });
+      console.log(`[Bootstrap] ${req.user.email} → ${assignedRole}`);
+      res.json({ success: true, role: assignedRole, message: `${req.user.email} is now ${assignedRole}` });
     } catch (error: any) {
       console.error('[Bootstrap] Error:', error.response?.data || error.message);
       res.status(500).json({ error: error.response?.data?.error?.message || error.message });
@@ -862,6 +864,37 @@ async function startServer() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  // Delete a user (admin/super-admin only; cannot delete self or super-admin if caller is admin)
+  app.delete('/api/users/:uid', checkAuth, checkRole(['admin', 'super-admin']), async (req: any, res: any) => {
+    const { uid } = req.params;
+    const db = req.db as FirestoreREST;
+
+    if (uid === req.user.uid) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    try {
+      const targetDoc = await db.getDoc('users', uid);
+      if (targetDoc.exists) {
+        const targetData = targetDoc.data();
+        if (targetData?.role === 'super-admin' && req.userData.role === 'admin') {
+          return res.status(403).json({ error: 'Admins cannot delete Super Admins' });
+        }
+      }
+      await db.deleteDoc('users', uid);
+      await db.addDoc('audit_logs', {
+        action_type: 'USER_DELETED',
+        entity_type: 'USER',
+        entity_id:   uid,
+        details:     `User deleted by ${req.user.email}`,
+        created_at:  new Date().toISOString(),
+        user_id:     req.user.uid,
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to delete user' });
     }
   });
 
