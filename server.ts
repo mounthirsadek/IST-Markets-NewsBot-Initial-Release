@@ -28,7 +28,7 @@ const __dirname = path.dirname(__filename);
 // ── Firebase config (from file or env) ───────────────────────────────────────
 let firebaseConfig: any = {
   projectId:          process.env.FIREBASE_PROJECT_ID     || "istnewsbot",
-  apiKey:             process.env.FIREBASE_API_KEY         || "AIzaSyCaxR1aE82Dif26SKy6ykEo3ZFv0C3dhCI",
+  apiKey:             process.env.FIREBASE_API_KEY,
   firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID   || "(default)",
 };
 
