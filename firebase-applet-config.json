@@ -1,10 +1,10 @@
 {
   "apiKey": "",
-  "authDomain": "istnewsbot.firebaseapp.com",
-  "projectId": "istnewsbot",
-  "storageBucket": "istnewsbot.firebasestorage.app",
-  "messagingSenderId": "890812129068",
-  "appId": "1:890812129068:web:04ddfc640a5ac9aea11689",
-  "measurementId": "G-7CXF2TMTWL",
+  "authDomain": "istnewsbot1.firebaseapp.com",
+  "projectId": "istnewsbot1",
+  "storageBucket": "istnewsbot1.firebasestorage.app",
+  "messagingSenderId": "72024228722",
+  "appId": "1:72024228722:web:0d8794de7f8f54744693eb",
+  "measurementId": "G-ZD8HGZVX4L",
   "firestoreDatabaseId": "(default)"
 }
