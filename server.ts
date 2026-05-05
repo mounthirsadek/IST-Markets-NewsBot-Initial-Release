@@ -200,6 +200,12 @@ async function startServer() {
 
   app.use(express.json({ limit: '20mb' }));
 
+  // Allow Firebase Auth popup to close itself without COOP blocking it
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    next();
+  });
+
   // ── Serve temp images publicly (no auth — Metricool needs to fetch these) ──
   app.get('/api/temp-image/:id', (req: any, res: any) => {
     const img = tempImageStore.get(req.params.id);
@@ -770,6 +776,50 @@ async function startServer() {
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // ── Current user profile (server-side read — works even when client SDK is offline) ──
+  app.get('/api/users/me', checkAuth, async (req: any, res: any) => {
+    try {
+      const db = req.db as FirestoreREST;
+      const userDoc = await db.getDoc('users', req.user.uid);
+      if (!userDoc.exists) return res.status(404).json({ error: 'User profile not found' });
+      res.json(userDoc.data());
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── First-time admin bootstrap ────────────────────────────────────────────────
+  // Safe to leave in — only works for the email set in FIRST_ADMIN_EMAIL env var.
+  // After first use the endpoint is effectively a no-op (role already set).
+  app.post('/api/admin/bootstrap', checkAuth, async (req: any, res: any) => {
+    const FIRST_ADMIN_EMAIL = process.env.FIRST_ADMIN_EMAIL || '';
+    if (!FIRST_ADMIN_EMAIL || req.user.email !== FIRST_ADMIN_EMAIL) {
+      return res.status(403).json({ error: 'Bootstrap not available for this account' });
+    }
+    try {
+      const db = req.db as FirestoreREST;
+      // Check if document already exists and already has a role
+      const userDoc = await db.getDoc('users', req.user.uid);
+      const existingRole = userDoc.exists ? userDoc.data()?.role : null;
+      if (existingRole === 'super-admin') {
+        return res.json({ success: true, role: 'super-admin', message: 'Already super-admin' });
+      }
+      // Create/update own document — Firestore rules allow: allow create: if isAuthenticated() && isOwner(uid)
+      await db.setDoc('users', req.user.uid, {
+        uid:        req.user.uid,
+        email:      req.user.email,
+        name:       req.user.displayName || req.user.email?.split('@')[0] || 'Admin',
+        role:       'super-admin',
+        created_at: new Date().toISOString(),
+      });
+      console.log(`[Bootstrap] ${req.user.email} → super-admin`);
+      res.json({ success: true, role: 'super-admin', message: `${req.user.email} is now super-admin` });
+    } catch (error: any) {
+      console.error('[Bootstrap] Error:', error.response?.data || error.message);
+      res.status(500).json({ error: error.response?.data?.error?.message || error.message });
     }
   });
 

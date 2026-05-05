@@ -38,10 +38,34 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          setRole(userSnap.data().role);
+        try {
+          // Primary path: load role via server API (REST, works even when client SDK is offline)
+          const idToken = await user.getIdToken();
+          const meRes = await fetch('/api/users/me', {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+
+          if (meRes.ok) {
+            const data = await meRes.json();
+            setRole(data.role || null);
+          } else if (meRes.status === 404) {
+            // User doc doesn't exist → try first-time bootstrap
+            const bootRes = await fetch('/api/admin/bootstrap', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            });
+            if (bootRes.ok) {
+              const bootData = await bootRes.json();
+              setRole(bootData.role || null);
+            }
+          }
+        } catch {
+          // Fallback: try Firestore client SDK directly
+          try {
+            const userRef = doc(db, 'users', user.uid);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) setRole(userSnap.data().role);
+          } catch { /* silent — role stays null */ }
         }
       } else {
         setRole(null);
