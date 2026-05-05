@@ -11,6 +11,7 @@ import * as otplib from 'otplib';
 const authenticator = (otplib as any).default?.authenticator || (otplib as any).authenticator;
 import QRCode from 'qrcode';
 import { createHash, randomUUID } from 'crypto';
+import { GoogleGenAI, Type } from "@google/genai";
 
 dotenv.config();
 
@@ -25,22 +26,14 @@ process.on('uncaughtException', (err) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ── Firebase config (from file or env) ───────────────────────────────────────
-let firebaseConfig: any = {
-  projectId:          process.env.FIREBASE_PROJECT_ID     || "istnewsbot",
-  apiKey:             process.env.FIREBASE_API_KEY,
-  firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID   || "(default)",
-};
-
-if (fs.existsSync('./firebase-applet-config.json')) {
-  const cfg = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
-  firebaseConfig = { ...firebaseConfig, ...cfg };
-}
-
-const FIREBASE_API_KEY  = firebaseConfig.apiKey;
-const FIRESTORE_PROJECT = firebaseConfig.projectId;
-const FIRESTORE_DB      = firebaseConfig.firestoreDatabaseId || '(default)';
+// ── Firebase config (from .env only) ─────────────────────────────────────────
+const FIREBASE_API_KEY  = process.env.FIREBASE_API_KEY!;
+const FIRESTORE_PROJECT = process.env.FIREBASE_PROJECT_ID || 'istnewsbot1';
+const FIRESTORE_DB      = process.env.FIREBASE_DATABASE_ID || '(default)';
 const FIRESTORE_BASE    = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/${FIRESTORE_DB}/documents`;
+
+// ── Gemini AI (server-side only — key never sent to browser) ──────────────────
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 console.log(`🔥 Using Firebase project: ${FIRESTORE_PROJECT} / DB: ${FIRESTORE_DB}`);
 
@@ -253,6 +246,87 @@ async function startServer() {
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // ── AI Proxy Endpoints (Gemini key stays server-side only) ────────────────
+
+  app.post("/api/ai/check-safety", checkAuth, async (req: any, res: any) => {
+    try {
+      const { content } = req.body;
+      if (!content) return res.status(400).json({ error: "Missing content" });
+      const prompt = `Analyze the following financial news content for safety. Flag content that is: 1. Prohibited financial advice (guaranteeing returns). 2. Hate speech or harassment. 3. Misleading or false market manipulation. 4. Explicit or inappropriate content.\n\nContent: ${content}\n\nReturn JSON: { "safe": boolean, "reason": string | null }`;
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash", contents: prompt,
+        config: { responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { safe: { type: Type.BOOLEAN }, reason: { type: Type.STRING, nullable: true } }, required: ["safe"] } }
+      });
+      res.json(JSON.parse(response.text || '{"safe":false}'));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/ai/rewrite", checkAuth, async (req: any, res: any) => {
+    try {
+      const { articleTitle, articleContent } = req.body;
+      if (!articleTitle || !articleContent) return res.status(400).json({ error: "Missing fields" });
+      const OPENING_HOOKS = ["Here's what's moving markets today —","Traders are watching closely as...","Market alert:","The numbers are in —","What every Forex trader needs to know right now:","A key development just hit the tape —","Eyes on the market:","Breaking through resistance —"];
+      const CLOSING_HOOKS = ["Here's why it matters for Forex traders.","Watch this space — the move could accelerate into the next session.","Analysts say the impact will be felt across multiple currency pairs.","Positioning ahead of tomorrow's session will be critical.","This is the data point markets have been waiting for.","The ripple effects are already being priced in."];
+      const prompt = `You are a Senior Forex Editor for IST Markets. Transform the following news into a polished editorial story for Instagram in both English and Arabic.\n\nOriginal Headline: ${articleTitle}\nOriginal Body: ${articleContent}\n\nSTRICT GUIDELINES:\n1. Tone: Professional, engaging, and authoritative.\n2. Length: 3 to 5 sentences per version.\n3. Audience: Forex and Commodity traders.\n4. NO guaranteed return claims or financial advice.\n5. NO political bias.\n6. Light CTA at the end.\n\nENGLISH STRUCTURE:\n- Opening Hook: Select one from: ${OPENING_HOOKS.join(' | ')}\n- Core News Body: Concise summary of the event.\n- Market Context: Why it matters for traders.\n- Closing Hook: Select one from: ${CLOSING_HOOKS.join(' | ')}\n\nARABIC STYLE:\n- Not a literal translation.\n- Use natural Arabic financial media style.\n- Preserve numbers and asset notation in standard format.\n- Full RTL compatibility.\n\nOUTPUT FORMAT (JSON ONLY):\n{\n  "en": { "headline": "...", "caption": "...", "hashtags": ["...", "..."] },\n  "ar": { "headline": "...", "caption": "...", "hashtags": ["...", "..."] }\n}`;
+      const storySchema = { type: Type.OBJECT, properties: { en: { type: Type.OBJECT, properties: { headline: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["headline","caption","hashtags"] }, ar: { type: Type.OBJECT, properties: { headline: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["headline","caption","hashtags"] } }, required: ["en","ar"] };
+      const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt, config: { responseMimeType: "application/json", responseSchema: storySchema } });
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/ai/generate-hook", checkAuth, async (req: any, res: any) => {
+    try {
+      const { articleTitle, articleContent } = req.body;
+      if (!articleTitle || !articleContent) return res.status(400).json({ error: "Missing fields" });
+      const prompt = `You are a viral financial markets content writer specializing in hook-based social media posts that drive massive engagement.\n\nArticle Title: ${articleTitle}\nArticle Content: ${articleContent}\n\nWrite TWO viral hook-based social media posts — one in English and one in Arabic.\n\nUse ONE of these psychological hook frameworks per post:\n- FOMO Hook: "Everyone is talking about X but nobody is telling you Y..."\n- Curiosity Gap: "The reason [thing] happened will shock you..."\n- Authority Hook: "After analyzing 1000+ trades, here's what actually moves markets..."\n- Pattern Recognition: "Every time X happens, Y follows within Z days..."\n- Contrarian Hook: "While everyone is [doing X], smart money is quietly doing Y..."\n- Educational Value: "3 things your broker won't tell you about [topic]..."\n\nRules:\n- English post: Max 2200 chars. Start with the hook. Use line breaks for readability. 3-5 relevant hashtags.\n- Arabic post: Max 2200 chars. Translate naturally with the same hook energy. 3-5 Arabic hashtags.\n- Headline: Short punchy hook title (max 15 words).\n- DO NOT use generic financial news language. Make it feel personal, urgent, and exciting.`;
+      const storySchema = { type: Type.OBJECT, properties: { en: { type: Type.OBJECT, properties: { headline: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["headline","caption","hashtags"] }, ar: { type: Type.OBJECT, properties: { headline: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["headline","caption","hashtags"] } }, required: ["en","ar"] };
+      const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt, config: { responseMimeType: "application/json", responseSchema: storySchema } });
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/ai/visual-brief", checkAuth, async (req: any, res: any) => {
+    try {
+      const { headline, caption } = req.body;
+      if (!headline || !caption) return res.status(400).json({ error: "Missing fields" });
+      const extractPrompt = `From this financial news headline and caption, extract the following in JSON:\n1. "subjectName": The main financial asset in UPPERCASE (e.g., GOLD, BTC, OIL, EUR, AAPL, S&P500).\n2. "mainElement": A physical 3D object representing this asset.\n3. "sentiment": One of "bullish", "bearish", or "neutral".\n\nHeadline: ${headline}\nCaption: ${caption}\n\nReturn ONLY valid JSON. Example: {"subjectName":"GOLD","mainElement":"shiny gold bars","sentiment":"bullish"}`;
+      let subjectName = 'MARKETS', mainElement = 'gold coins and a rising arrow chart', sentiment = 'neutral';
+      try {
+        const extractRes = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: extractPrompt });
+        const match = (extractRes.text || '').match(/\{[\s\S]*?\}/);
+        if (match) { const d = JSON.parse(match[0]); if (d.subjectName) subjectName = String(d.subjectName).toUpperCase(); if (d.mainElement) mainElement = String(d.mainElement); if (d.sentiment) sentiment = String(d.sentiment); }
+      } catch { /* fallback */ }
+      const accentMap: Record<string,string> = { bullish: 'emerald green', bearish: 'crimson red', neutral: 'silver white' };
+      const moodMap: Record<string,string> = { bullish: 'optimistic, energetic, upward momentum', bearish: 'tense, dramatic, downward pressure', neutral: 'professional, analytical, balanced' };
+      const brief = `A professional financial advertisement poster for IST Markets brand.\nBACKGROUND: deep royal purple gradient — dark violet #150033 at the edges blending to rich purple #3d0066 in the center. The background MUST remain purple throughout.\nFOREGROUND: cinematic 3D rendered composition of ${mainElement} leaning against large bold 3D metallic silver letters spelling "${subjectName}". The ${mainElement} has subtle ${accentMap[sentiment]??accentMap.neutral} rim lighting and small ${accentMap[sentiment]??accentMap.neutral} glowing particles around it.\nDECORATIVE: elegant thin white abstract wave lines and floating light particles on the purple background.\nMOOD: ${moodMap[sentiment]??moodMap.neutral}.\nSTYLE: Studio-quality lighting, sharp shadows, cinematic depth of field, 8K resolution, minimalist corporate luxury style. Photorealistic render. No captions, no overlaid text, no news headlines — only the 3D composition.`;
+      res.json(brief);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/ai/generate-image", checkAuth, async (req: any, res: any) => {
+    try {
+      const { brief, aspectRatio = '1:1' } = req.body;
+      if (!brief) return res.status(400).json({ error: "Missing brief" });
+      const VALID_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9'];
+      const ratio = VALID_RATIOS.includes(aspectRatio) ? aspectRatio : '1:1';
+      const response = await ai.models.generateImages({ model: 'imagen-4.0-fast-generate-001', prompt: brief, config: { numberOfImages: 1, aspectRatio: ratio } });
+      const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
+      if (!imageBytes) throw new Error("Failed to generate image");
+      res.json({ imageData: `data:image/png;base64,${imageBytes}` });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/ai/social-caption", checkAuth, async (req: any, res: any) => {
+    try {
+      const { headline, caption } = req.body;
+      if (!headline || !caption) return res.status(400).json({ error: "Missing fields" });
+      const prompt = `Convert the following news article into a social media caption package for Instagram.\n\nHeadline: ${headline}\nEditorial Caption: ${caption}\n\nRequirements:\n1. Opening Hook: A punchy, attention-grabbing first line.\n2. Article Summary: A concise 2-3 sentence summary of the key news.\n3. CTA: A clear call to action.\n4. Hashtags: 5-7 relevant hashtags.\n\nProvide output in both English and natural, professional Arabic.\n\nOUTPUT FORMAT (JSON ONLY):\n{\n  "en": { "hook": "...", "summary": "...", "cta": "...", "hashtags": ["..."] },\n  "ar": { "hook": "...", "summary": "...", "cta": "...", "hashtags": ["..."] }\n}`;
+      const socialSchema = { type: Type.OBJECT, properties: { en: { type: Type.OBJECT, properties: { hook: { type: Type.STRING }, summary: { type: Type.STRING }, cta: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["hook","summary","cta","hashtags"] }, ar: { type: Type.OBJECT, properties: { hook: { type: Type.STRING }, summary: { type: Type.STRING }, cta: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["hook","summary","cta","hashtags"] } }, required: ["en","ar"] };
+      const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt, config: { responseMimeType: "application/json", responseSchema: socialSchema } });
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // ─── Brand Asset Upload → in-memory temp store ───────────────────────────
