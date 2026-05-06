@@ -795,30 +795,55 @@ async function startServer() {
     }
   });
 
-  // ── First-time admin bootstrap ────────────────────────────────────────────────
-  // Safe to leave in — only works for the email set in FIRST_ADMIN_EMAIL env var.
-  // After first use the endpoint is effectively a no-op (role already set).
+  // ── Admin bootstrap / first-login doc creation ───────────────────────────────
+  // Called on every login from App.tsx.
+  // • FIRST_ADMIN_EMAIL user  → always ensures super-admin role (upgrades if needed)
+  // • New user (no doc)       → creates doc with viewer role
+  // • Existing user           → returns current role unchanged
   app.post('/api/admin/bootstrap', checkAuth, async (req: any, res: any) => {
-    const FIRST_ADMIN_EMAIL = process.env.FIRST_ADMIN_EMAIL || '';
+    const FIRST_ADMIN_EMAIL = (process.env.FIRST_ADMIN_EMAIL || '').trim().toLowerCase();
+    const callerEmail       = (req.user.email || '').trim().toLowerCase();
+    const isFirstAdmin      = FIRST_ADMIN_EMAIL !== '' && callerEmail === FIRST_ADMIN_EMAIL;
+
     try {
       const db = req.db as FirestoreREST;
-      // Check if document already exists and already has a role
-      const userDoc = await db.getDoc('users', req.user.uid);
-      const existingRole = userDoc.exists ? userDoc.data()?.role : null;
-      if (existingRole === 'super-admin') {
-        return res.json({ success: true, role: 'super-admin', message: 'Already super-admin' });
+      const userDoc     = await db.getDoc('users', req.user.uid);
+      const existingData = userDoc.exists ? userDoc.data() : null;
+      const existingRole = existingData?.role as string | null;
+
+      // Case 1: FIRST_ADMIN_EMAIL — always guarantee super-admin
+      if (isFirstAdmin) {
+        if (existingRole === 'super-admin') {
+          return res.json({ success: true, role: 'super-admin' });
+        }
+        // Upgrade (or create) to super-admin
+        await db.setDoc('users', req.user.uid, {
+          uid:        req.user.uid,
+          email:      req.user.email,
+          name:       existingData?.name || req.user.displayName || req.user.email?.split('@')[0] || 'Admin',
+          role:       'super-admin',
+          created_at: existingData?.created_at || new Date().toISOString(),
+        });
+        console.log(`[Bootstrap] ${req.user.email} → super-admin`);
+        return res.json({ success: true, role: 'super-admin' });
       }
-      // Create/update own document — Firestore rules allow: allow create: if isAuthenticated() && isOwner(uid)
-      const assignedRole = req.user.email === FIRST_ADMIN_EMAIL ? 'super-admin' : 'viewer';
+
+      // Case 2: Existing user — return current role, do not modify
+      if (existingRole) {
+        return res.json({ success: true, role: existingRole });
+      }
+
+      // Case 3: New user — create viewer doc
       await db.setDoc('users', req.user.uid, {
         uid:        req.user.uid,
         email:      req.user.email,
         name:       req.user.displayName || req.user.email?.split('@')[0] || 'User',
-        role:       assignedRole,
+        role:       'viewer',
         created_at: new Date().toISOString(),
       });
-      console.log(`[Bootstrap] ${req.user.email} → ${assignedRole}`);
-      res.json({ success: true, role: assignedRole, message: `${req.user.email} is now ${assignedRole}` });
+      console.log(`[Bootstrap] ${req.user.email} → viewer (new user)`);
+      res.json({ success: true, role: 'viewer' });
+
     } catch (error: any) {
       console.error('[Bootstrap] Error:', error.response?.data || error.message);
       res.status(500).json({ error: error.response?.data?.error?.message || error.message });
