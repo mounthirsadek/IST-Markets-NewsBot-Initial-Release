@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Zap, Image as ImageIcon, Save, Languages, ChevronLeft, Loader2, AlertCircle, Download, Maximize2, X, Radio, Search, RefreshCw } from 'lucide-react';
-import { generateHookContent, generateStoryImage, generateVisualBrief, StoryContent } from '../services/geminiService';
+import { generateHookContent, generateStoryImage, generateVisualBrief, StoryContent, ImageProvider } from '../services/geminiService';
 import { fetchWithAuth } from '../lib/api';
 import { useAuthStore } from '../store';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
@@ -123,6 +123,7 @@ export default function HooksEditor() {
   const [imageUrl, setImageUrl] = useState('');
   const [enBrandedUrl, setEnBrandedUrl] = useState('');
   const [arBrandedUrl, setArBrandedUrl] = useState('');
+  const [imageProvider, setImageProvider] = useState<ImageProvider>('gemini');
   const [selectedFormat, setSelectedFormat] = useState('ig-portrait');
   const [imageGenFormat, setImageGenFormat] = useState('');
   const [brandSettings, setBrandSettings] = useState<BrandSettings | null>(null);
@@ -205,7 +206,7 @@ export default function HooksEditor() {
     try {
       const currentFormat = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
       const brief = await generateVisualBrief(enHeadline, enCaption);
-      const url   = await generateStoryImage(brief, currentFormat.aspectRatio);
+      const url   = await generateStoryImage(brief, currentFormat.aspectRatio, imageProvider);
       setImageUrl(url);
       setImageGenFormat(selectedFormat);
       const colors = await extractDominantColors(url);
@@ -756,6 +757,24 @@ export default function HooksEditor() {
               )}
             </div>
 
+            {/* ── Image Provider Selector ── */}
+            <div className="hidden md:flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-xl">
+              {(['gemini', 'openai'] as ImageProvider[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setImageProvider(p)}
+                  className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    imageProvider === p
+                      ? p === 'gemini'
+                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      : 'text-white/30 hover:text-white/60'
+                  }`}
+                >
+                  {p === 'gemini' ? '🔵 Gemini Imagen' : '🟢 GPT-Image-1'}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleGenerateImage}
               disabled={imageGenerating || !enHeadline}
@@ -956,7 +975,25 @@ export default function HooksEditor() {
       )}
 
       {/* ── Mobile Fixed Bottom Actions ─────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0a0a0a]/95 backdrop-blur-sm border-t border-white/10 px-4 py-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0a0a0a]/95 backdrop-blur-sm border-t border-white/10 px-4 py-3 space-y-2">
+        {/* Mobile provider toggle */}
+        <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-xl">
+          {(['gemini', 'openai'] as ImageProvider[]).map(p => (
+            <button
+              key={p}
+              onClick={() => setImageProvider(p)}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                imageProvider === p
+                  ? p === 'gemini'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                    : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                  : 'text-white/30 hover:text-white/60'
+              }`}
+            >
+              {p === 'gemini' ? '🔵 Gemini' : '🟢 GPT-Image'}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={handleGenerate}

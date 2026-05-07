@@ -11,6 +11,7 @@ const authenticator = (otplib as any).default?.authenticator || (otplib as any).
 import QRCode from 'qrcode';
 import { createHash, randomUUID } from 'crypto';
 import { GoogleGenAI, Type } from "@google/genai";
+import OpenAI from 'openai';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -31,6 +32,16 @@ const __dirname = path.dirname(__filename);
 
 // ── Gemini AI (server-side only) ──────────────────────────────────────────────
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+
+// Aspect ratio → OpenAI size mapping
+const OPENAI_SIZE_MAP: Record<string, '1024x1024' | '1536x1024' | '1024x1536'> = {
+  '1:1':  '1024x1024',
+  '4:3':  '1536x1024',
+  '16:9': '1536x1024',
+  '3:4':  '1024x1536',
+  '9:16': '1024x1536',
+};
 
 // ── MySQL Connection Pool ─────────────────────────────────────────────────────
 const pool = mysql.createPool({
@@ -682,14 +693,30 @@ async function startServer() {
 
   app.post('/api/ai/generate-image', checkAuth, async (req: any, res: any) => {
     try {
-      const { brief, aspectRatio = '1:1' } = req.body;
+      const { brief, aspectRatio = '1:1', provider = 'gemini' } = req.body;
       if (!brief) return res.status(400).json({ error: 'Missing brief' });
       const VALID_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9'];
       const ratio = VALID_RATIOS.includes(aspectRatio) ? aspectRatio : '1:1';
-      const response = await ai.models.generateImages({ model: 'imagen-4.0-fast-generate-001', prompt: brief, config: { numberOfImages: 1, aspectRatio: ratio } });
-      const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
-      if (!imageBytes) throw new Error('Failed to generate image');
-      res.json({ imageData: `data:image/png;base64,${imageBytes}` });
+
+      if (provider === 'openai') {
+        if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
+        const size = OPENAI_SIZE_MAP[ratio] ?? '1024x1024';
+        const response = await openai.images.generate({
+          model: 'gpt-image-1',
+          prompt: brief,
+          n: 1,
+          size,
+        });
+        const b64 = response.data?.[0]?.b64_json;
+        if (!b64) throw new Error('No image returned from OpenAI');
+        res.json({ imageData: `data:image/png;base64,${b64}` });
+      } else {
+        // Default: Google Imagen
+        const response = await ai.models.generateImages({ model: 'imagen-4.0-fast-generate-001', prompt: brief, config: { numberOfImages: 1, aspectRatio: ratio } });
+        const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
+        if (!imageBytes) throw new Error('Failed to generate image');
+        res.json({ imageData: `data:image/png;base64,${imageBytes}` });
+      }
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

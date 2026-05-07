@@ -59,8 +59,10 @@ export const generateHookContent = (articleTitle: string, articleContent: string
 export const generateVisualBrief = (headline: string, caption: string) =>
   callAI<string>('visual-brief', { headline, caption });
 
-export const generateStoryImage = async (brief: string, aspectRatio = '1:1'): Promise<string> => {
-  const result = await callAI<{ imageData: string }>('generate-image', { brief, aspectRatio });
+export type ImageProvider = 'gemini' | 'openai';
+
+export const generateStoryImage = async (brief: string, aspectRatio = '1:1', provider: ImageProvider = 'gemini'): Promise<string> => {
+  const result = await callAI<{ imageData: string }>('generate-image', { brief, aspectRatio, provider });
   return result.imageData;
 };
 
