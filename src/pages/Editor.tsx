@@ -742,7 +742,7 @@ export default function Editor() {
                       : 'text-white/30 hover:text-white/60'
                   }`}
                 >
-                  {p === 'gemini' ? '🔵 Gemini Imagen' : '🟢 GPT-Image-1'}
+                  {p === 'gemini' ? '🔵 Gemini Imagen' : '🟢 GPT-Image-2'}
                 </button>
               ))}
             </div>

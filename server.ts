@@ -702,7 +702,7 @@ async function startServer() {
         if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
         const size = OPENAI_SIZE_MAP[ratio] ?? '1024x1024';
         const response = await openai.images.generate({
-          model: 'gpt-image-1',
+          model: 'gpt-image-2',
           prompt: brief,
           n: 1,
           size,
