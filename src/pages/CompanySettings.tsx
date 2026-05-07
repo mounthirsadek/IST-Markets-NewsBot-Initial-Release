@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Save, ChevronLeft, Loader2, Globe, Hash, Link as LinkIcon, ShieldAlert, Instagram, Eye, EyeOff, Lock, RefreshCw } from 'lucide-react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
 import { useAuthStore } from '../store';
 import { fetchWithAuth } from '../lib/api';
 
@@ -43,12 +41,9 @@ export default function CompanySettings() {
 
   const fetchSettings = async () => {
     try {
-      const docRef = doc(db, 'settings', 'company');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data() as CompanySettings;
-        setSettings(prev => ({ ...prev, ...data }));
-      }
+      const res = await fetchWithAuth('/api/settings/company');
+      const data = await res.json();
+      if (data) setSettings(prev => ({ ...prev, ...data }));
     } catch (error) {
       console.error("Failed to fetch company settings", error);
     } finally {
@@ -61,18 +56,7 @@ export default function CompanySettings() {
     
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'company'), settings);
-      
-      // Log the action
-      await fetchWithAuth('/api/audit-logs', {
-        method: 'POST',
-        body: JSON.stringify({
-          action_type: 'UPDATE_COMPANY_SETTINGS',
-          entity_type: 'SETTINGS',
-          entity_id: 'company',
-          details: `Company settings updated by ${auth.currentUser?.email}`
-        })
-      });
+      await fetchWithAuth('/api/settings/company', { method: 'PUT', body: JSON.stringify(settings) });
     } catch (error) {
       console.error("Save failed", error);
     } finally {

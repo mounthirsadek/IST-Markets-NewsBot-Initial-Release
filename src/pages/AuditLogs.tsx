@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { History, Search, Filter, Calendar, User, Activity, Database, Settings, Shield } from 'lucide-react';
 import { format } from 'date-fns';
-import { auth } from '../firebase';
 import { fetchWithAuth } from '../lib/api';
 
 interface AuditLog {

@@ -38,7 +38,8 @@ const ROLES = (Object.entries(ROLE_CONFIG) as [RoleKey, typeof ROLE_CONFIG[RoleK
   .sort((a, b) => a[1].order - b[1].order);
 
 // ── Permissions matrix ─────────────────────────────────────────────────────────
-const PERMISSIONS: { feature: string; [k in RoleKey]: boolean }[] = [
+type PermissionRow = { feature: string } & Record<RoleKey, boolean>;
+const PERMISSIONS: PermissionRow[] = [
   { feature: 'Dashboard',        viewer: true,  editor: true,  'senior-editor': true,  admin: true,  'super-admin': true  },
   { feature: 'News Feed',        viewer: false, editor: true,  'senior-editor': true,  admin: true,  'super-admin': true  },
   { feature: 'Editor',           viewer: false, editor: true,  'senior-editor': true,  admin: true,  'super-admin': true  },
@@ -162,7 +163,7 @@ export default function Admin() {
   });
 
   const canModifyUser = (u: UserRecord) => {
-    if (u.id === myUser?.uid) return false;          // can't modify self
+    if (u.id === myUser?.id) return false;          // can't modify self
     if (myRole === 'super-admin') return true;
     if (myRole === 'admin' && u.role !== 'super-admin') return true;
     return false;
@@ -348,7 +349,7 @@ export default function Admin() {
             <tbody>
               {filtered.map((u, idx) => {
                 const cfg = ROLE_CONFIG[u.role] ?? ROLE_CONFIG['viewer'];
-                const isSelf = u.id === myUser?.uid;
+                const isSelf = u.id === myUser?.id;
                 const canEdit = canModifyUser(u);
 
                 return (

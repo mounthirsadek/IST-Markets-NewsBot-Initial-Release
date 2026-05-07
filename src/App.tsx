@@ -1,8 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
 import { useAuthStore } from './store';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -19,61 +16,38 @@ import Login from './pages/Login';
 import HooksEditor from './pages/HooksEditor';
 import TrendingPage from './pages/TrendingPage';
 
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
   const { user, role } = useAuthStore();
-  
   if (!user) return <Navigate to="/login" />;
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to="/" />;
-  }
-  
+  if (allowedRoles && role && !allowedRoles.includes(role)) return <Navigate to="/" />;
   return <>{children}</>;
 };
 
 export default function App() {
-  const { user, setUser, setRole, role } = useAuthStore();
+  const { user, setUser, logout } = useAuthStore();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        try {
-          // Always call bootstrap on login:
-          // • Ensures FIRST_ADMIN_EMAIL gets super-admin (even if doc exists with wrong role)
-          // • Creates viewer doc for brand-new users
-          // • Returns existing role for everyone else (no-op)
-          const idToken = await user.getIdToken();
-          const bootRes = await fetch('/api/admin/bootstrap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-          });
-          if (bootRes.ok) {
-            const bootData = await bootRes.json();
-            setRole(bootData.role || null);
-          } else {
-            // Fallback: read role directly from Firestore client SDK
-            try {
-              const userRef = doc(db, 'users', user.uid);
-              const userSnap = await getDoc(userRef);
-              if (userSnap.exists()) setRole(userSnap.data().role);
-            } catch { /* silent */ }
-          }
-        } catch {
-          // Network error fallback
-          try {
-            const userRef = doc(db, 'users', user.uid);
-            const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) setRole(userSnap.data().role);
-          } catch { /* silent — role stays null */ }
-        }
-      } else {
-        setRole(null);
-      }
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
       setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [setUser, setRole]);
+      return;
+    }
+
+    fetch('/api/users/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(userData => {
+        if (userData) {
+          setUser(userData);
+        } else {
+          logout();
+        }
+      })
+      .catch(() => logout())
+      .finally(() => setLoading(false));
+  }, [setUser, logout]);
 
   if (loading) {
     return (
@@ -99,7 +73,7 @@ export default function App() {
           <Route path="admin" element={<ProtectedRoute allowedRoles={['admin', 'super-admin']}><Admin /></ProtectedRoute>} />
           <Route path="hooks/:articleId?" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><HooksEditor /></ProtectedRoute>} />
           <Route path="trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
-          <Route path="security" element={<TwoFactorSetup />} />
+          <Route path="security" element={<ProtectedRoute><TwoFactorSetup /></ProtectedRoute>} />
         </Route>
       </Routes>
     </Router>

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Zap, Image as ImageIcon, Save, Languages, ChevronLeft, Loader2, AlertCircle, Download, Maximize2, X, Radio, Search, RefreshCw } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, limit, doc, getDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
 import { generateHookContent, generateStoryImage, generateVisualBrief, StoryContent } from '../services/geminiService';
+import { fetchWithAuth } from '../lib/api';
+import { useAuthStore } from '../store';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
 import BrandedCanvas from '../components/BrandedCanvas';
 
@@ -99,6 +99,7 @@ const extractDominantColors = (dataUrl: string, topN = 5): Promise<string[]> =>
 export default function HooksEditor() {
   const { articleId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   // ── Article selector state ──────────────────────────────────────────────────
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -146,46 +147,30 @@ export default function HooksEditor() {
 
   // ── Load brand settings ─────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchBrand = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'settings', 'brand'));
-        setBrandSettings(docSnap.exists()
-          ? { ...DEFAULT_BRAND_SETTINGS, ...docSnap.data() as BrandSettings }
-          : DEFAULT_BRAND_SETTINGS);
-      } catch {
-        setBrandSettings(DEFAULT_BRAND_SETTINGS);
-      }
-    };
-    fetchBrand();
+    fetchWithAuth('/api/settings/brand')
+      .then(r => r.json())
+      .then(data => setBrandSettings(data ? { ...DEFAULT_BRAND_SETTINGS, ...data } : DEFAULT_BRAND_SETTINGS))
+      .catch(() => setBrandSettings(DEFAULT_BRAND_SETTINGS));
   }, []);
 
-  // ── Directly fetch the article from URL param (same pattern as Editor) ──────
+  // ── Directly fetch the article from URL param ────────────────────────────────
   useEffect(() => {
     if (!articleId) return;
-    const fetchTargetArticle = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'news', articleId));
-        if (docSnap.exists()) {
-          setSelectedArticle({ id: docSnap.id, ...docSnap.data() } as NewsArticle);
-        }
-      } catch (err) {
-        console.error('Failed to fetch target article', err);
-      }
-    };
-    fetchTargetArticle();
+    fetchWithAuth(`/api/news/articles/${articleId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setSelectedArticle(data as NewsArticle); })
+      .catch(err => console.error('Failed to fetch target article', err));
   }, [articleId]);
 
-  // ── Subscribe to news articles ──────────────────────────────────────────────
+  // ── Load news articles ──────────────────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db, 'news'), orderBy('published_at_source', 'desc'), limit(150));
-    const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as NewsArticle))
-        .filter(a => a.status !== 'rejected');
-      setArticles(docs);
-      setArticlesLoading(false);
-    }, () => setArticlesLoading(false));
-    return () => unsub();
+    fetchWithAuth('/api/news/articles')
+      .then(r => r.json())
+      .then((docs: NewsArticle[]) => {
+        setArticles((Array.isArray(docs) ? docs : []).filter(a => a.status !== 'rejected'));
+        setArticlesLoading(false);
+      })
+      .catch(() => setArticlesLoading(false));
   }, []);
 
   // ── Generate hook content ───────────────────────────────────────────────────
@@ -238,7 +223,11 @@ export default function HooksEditor() {
   const handleSaveColor = async (color: string) => {
     setSavingColor(true);
     try {
-      await setDoc(doc(db, 'settings', 'brand'), { defaultAccentColor: color }, { merge: true });
+      const currentSettings = brandSettings || DEFAULT_BRAND_SETTINGS;
+      await fetchWithAuth('/api/settings/brand', {
+        method: 'PUT',
+        body: JSON.stringify({ ...currentSettings, defaultAccentColor: color }),
+      });
       setBrandSettings(prev => prev ? { ...prev, defaultAccentColor: color } : prev);
       setSelectedExtractedColor(color);
     } catch (err) {
@@ -279,18 +268,17 @@ export default function HooksEditor() {
       const finalEn = enBrandedUrl ? await compressCanvasImage(enBrandedUrl) : '';
       const finalAr = arBrandedUrl ? await compressCanvasImage(arBrandedUrl) : '';
 
-      await addDoc(collection(db, 'stories'), {
-        type: 'hook',
-        originalArticleId: selectedArticle?.id || null,
-        en: { headline: enHeadline, caption: enCaption, hashtags: enHashtags },
-        ar: { headline: arHeadline, caption: arCaption, hashtags: arHashtags },
-        imageUrl,
-        enBrandedUrl: finalEn,
-        arBrandedUrl: finalAr,
-        format: selectedFormat,
-        status: 'draft',
-        createdBy: auth.currentUser?.uid,
-        createdAt: serverTimestamp(),
+      await fetchWithAuth('/api/stories', {
+        method: 'POST',
+        body: JSON.stringify({
+          news_id: selectedArticle?.id || null,
+          headline_en: enHeadline, caption_en: enCaption, hashtags_en: enHashtags,
+          headline_ar: arHeadline, caption_ar: arCaption, hashtags_ar: arHashtags,
+          image_url: imageUrl,
+          format: selectedFormat,
+          status: 'draft',
+          created_by: user?.id,
+        }),
       });
 
       navigate('/archive');
@@ -332,12 +320,9 @@ export default function HooksEditor() {
   };
 
   const uploadCanvasForMetricool = async (dataUrl: string): Promise<string> => {
-    const token = await auth.currentUser?.getIdToken();
-    const filePath = `metricool-posts/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const res = await fetch('/api/upload-brand-asset', {
+    const res = await fetchWithAuth('/api/upload-brand-asset', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ dataUrl, filePath }),
+      body: JSON.stringify({ dataUrl }),
     });
     if (!res.ok) throw new Error('Failed to upload image for Metricool');
     const { url } = await res.json();

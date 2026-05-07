@@ -1,10 +1,9 @@
 import axios from 'axios';
-import { auth } from '../firebase';
 
 // ── Shared proxy helper ───────────────────────────────────────────────────────
 // All AI calls go through the backend. The Gemini API key never reaches the browser.
 async function callAI<T>(endpoint: string, body: object): Promise<T> {
-  const token = await auth.currentUser?.getIdToken();
+  const token = localStorage.getItem('auth_token');
   const res = await fetch(`/api/ai/${endpoint}`, {
     method: 'POST',
     headers: {

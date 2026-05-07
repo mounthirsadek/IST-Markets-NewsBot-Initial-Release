@@ -1,7 +1,5 @@
-import { auth } from '../firebase';
-
 const getAuthHeader = async (): Promise<Record<string, string>> => {
-  const token = await auth.currentUser?.getIdToken();
+  const token = localStorage.getItem('auth_token');
   if (!token) throw new Error('Not authenticated');
   return { Authorization: `Bearer ${token}` };
 };

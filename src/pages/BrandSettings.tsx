@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { Palette, Save, Upload, Layout, Type, Info, CheckCircle2, Loader2 } from 'lucide-react';
+import { fetchWithAuth } from '../lib/api';
 import { motion } from 'framer-motion';
 
 interface BrandSettings {
@@ -39,11 +38,9 @@ export default function BrandSettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const docRef = doc(db, 'settings', 'brand');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setSettings(docSnap.data() as BrandSettings);
-        }
+        const res = await fetchWithAuth('/api/settings/brand');
+        const data = await res.json();
+        if (data) setSettings(s => ({ ...s, ...data }));
       } catch (error) {
         console.error("Error fetching brand settings:", error);
       } finally {
@@ -56,7 +53,7 @@ export default function BrandSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'brand'), settings);
+      await fetchWithAuth('/api/settings/brand', { method: 'PUT', body: JSON.stringify(settings) });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {

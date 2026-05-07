@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap, TrendingUp } from 'lucide-react';
-import { auth, logout } from '../firebase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuthStore } from '../store';
@@ -25,13 +24,13 @@ const navItems = [
 ];
 
 export default function Layout() {
-  const { role } = useAuthStore();
+  const { role, user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    logout();
     navigate('/login');
   };
 
@@ -111,14 +110,12 @@ export default function Layout() {
 
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 px-4 py-3 mb-2">
-            <img
-              src={auth.currentUser?.photoURL || 'https://picsum.photos/seed/user/40/40'}
-              className="w-8 h-8 rounded-full border border-white/20 shrink-0"
-              alt="User"
-            />
+            <div className="w-8 h-8 rounded-full border border-white/20 bg-[#f27d26]/20 flex items-center justify-center text-[#f27d26] font-bold text-sm shrink-0">
+              {(user?.name || user?.username || 'U')[0].toUpperCase()}
+            </div>
             <div className="overflow-hidden min-w-0">
-              <p className="text-sm font-medium truncate">{auth.currentUser?.displayName}</p>
-              <p className="text-[10px] text-white/40 truncate">{auth.currentUser?.email}</p>
+              <p className="text-sm font-medium truncate">{user?.name || user?.username}</p>
+              <p className="text-[10px] text-white/40 truncate">{user?.email || user?.username}</p>
             </div>
           </div>
           <button

@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, CheckCircle2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import { fetchWithAuth } from '../lib/api';
 import { Link } from 'react-router-dom';
 
 interface Story {
   id: string;
-  headline: string;
+  headline_en: string;
+  headline_ar?: string;
   status: string;
-  scheduledAt?: any;
-  createdAt: any;
+  scheduled_at?: string | null;
+  created_at: string;
   theme: string;
 }
 
@@ -21,28 +20,34 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'stories'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setStories(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Story)));
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    loadStories();
+    const interval = setInterval(loadStories, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadStories = () => {
+    fetchWithAuth('/api/stories')
+      .then(r => r.json())
+      .then((data: Story[]) => {
+        setStories(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  };
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart);
   const endDate = endOfWeek(monthEnd);
 
-  const calendarDays = eachDayOfInterval({
-    start: startDate,
-    end: endDate,
-  });
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
 
   const getStoriesForDay = (day: Date) => {
     return stories.filter(story => {
-      const storyDate = story.scheduledAt?.toDate() || story.createdAt?.toDate();
-      return storyDate && isSameDay(storyDate, day);
+      const rawDate = story.scheduled_at || story.created_at;
+      if (!rawDate) return false;
+      const storyDate = new Date(rawDate);
+      return isSameDay(storyDate, day);
     });
   };
 
@@ -81,14 +86,14 @@ export default function Calendar() {
 
         {/* Calendar Grid */}
         <div className="grid grid-cols-7 auto-rows-[150px]">
-          {calendarDays.map((day, idx) => {
+          {calendarDays.map((day) => {
             const dayStories = getStoriesForDay(day);
             const isCurrentMonth = isSameMonth(day, monthStart);
             const isToday = isSameDay(day, new Date());
 
             return (
-              <div 
-                key={day.toString()} 
+              <div
+                key={day.toString()}
                 className={`p-2 border-r border-b border-white/5 relative group transition-colors ${
                   !isCurrentMonth ? 'opacity-20' : 'hover:bg-white/[0.02]'
                 }`}
@@ -101,12 +106,12 @@ export default function Calendar() {
 
                 <div className="space-y-1 overflow-y-auto max-h-[100px] scrollbar-hide">
                   {dayStories.map(story => (
-                    <Link 
+                    <Link
                       key={story.id}
                       to={`/publish/${story.id}`}
                       className={`block p-1.5 rounded text-[10px] truncate border transition-all ${
-                        story.status === 'published' 
-                          ? 'bg-green-400/10 border-green-400/20 text-green-400' 
+                        story.status === 'published'
+                          ? 'bg-green-400/10 border-green-400/20 text-green-400'
                           : story.status === 'scheduled'
                           ? 'bg-blue-400/10 border-blue-400/20 text-blue-400'
                           : 'bg-white/5 border-white/10 text-white/60'
@@ -114,7 +119,7 @@ export default function Calendar() {
                     >
                       <div className="flex items-center gap-1">
                         {story.status === 'published' ? <CheckCircle2 size={10} /> : <Clock size={10} />}
-                        <span className="truncate">{story.headline}</span>
+                        <span className="truncate">{story.headline_en}</span>
                       </div>
                     </Link>
                   ))}

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { db } from '../firebase';
 import { TrendingUp, CalendarDays, BarChart2, Hash, Layers } from 'lucide-react';
+import { fetchWithAuth } from '../lib/api';
 import { MARKET_SYMBOLS, MarketSymbol, articleMentionsSymbol, CATEGORY_COLORS, CATEGORY_BG } from '../data/symbols';
 
 interface NewsArticle {
@@ -39,15 +38,13 @@ export default function TrendingPage() {
   const [dateTo, setDateTo]     = useState(today);
 
   useEffect(() => {
-    const q = query(collection(db, 'news'), orderBy('published_at_source', 'desc'), limit(500));
-    const unsub = onSnapshot(q, snap => {
-      const docs = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as NewsArticle))
-        .filter(a => a.status !== 'rejected');
-      setArticles(docs);
-      setLoading(false);
-    }, () => setLoading(false));
-    return () => unsub();
+    fetchWithAuth('/api/news/articles')
+      .then(r => r.json())
+      .then((docs: NewsArticle[]) => {
+        setArticles((Array.isArray(docs) ? docs : []).filter(a => a.status !== 'rejected'));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   // Articles in date range

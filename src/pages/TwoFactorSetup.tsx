@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Shield, ShieldCheck, ShieldAlert, Lock, Smartphone, CheckCircle2, AlertCircle, Copy, RefreshCw } from 'lucide-react';
-import { auth } from '../firebase';
 import { fetchWithAuth } from '../lib/api';
 
 export default function TwoFactorSetup() {

@@ -3,8 +3,6 @@ import { motion } from 'motion/react';
 import { Newspaper, PenTool, Archive, TrendingUp, Users, Clock, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuthStore } from '../store';
 import { fetchWithAuth } from '../lib/api';
 
@@ -43,19 +41,12 @@ export default function Dashboard() {
   useEffect(() => {
     fetchMetrics();
     checkHealth();
-    
-    // Listen for recent audit logs only for admins
-    let unsubscribe = () => {};
     if (role === 'admin' || role === 'super-admin') {
-      const q = query(collection(db, 'audit_logs'), orderBy('created_at', 'desc'), limit(5));
-      unsubscribe = onSnapshot(q, (snapshot) => {
-        setRecentActivity(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Activity)));
-      }, (error) => {
-        console.error("Audit logs listener error:", error);
-      });
+      fetchWithAuth('/api/audit-logs')
+        .then(r => r.json())
+        .then((logs: Activity[]) => setRecentActivity(logs.slice(0, 5)))
+        .catch(e => console.error('Audit logs fetch error:', e));
     }
-
-    return () => unsubscribe();
   }, [role]);
 
   const fetchMetrics = async () => {

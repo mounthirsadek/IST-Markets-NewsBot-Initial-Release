@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Sparkles, Image as ImageIcon, Send, Save, Languages, ChevronLeft, Loader2, XCircle, RefreshCw, AlertCircle, Download, Maximize2, X, Radio } from 'lucide-react';
-import { doc, getDoc, addDoc, collection, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
 import { rewriteArticle, generateStoryImage, generateVisualBrief, checkSafety, StoryContent } from '../services/geminiService';
+import { fetchWithAuth } from '../lib/api';
+import { useAuthStore } from '../store';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
 import BrandedCanvas from '../components/BrandedCanvas';
 
@@ -88,6 +88,7 @@ const extractDominantColors = (dataUrl: string, topN = 5): Promise<string[]> =>
 export default function Editor() {
   const { articleId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -137,16 +138,10 @@ export default function Editor() {
 
   const fetchBrandSettings = async () => {
     try {
-      const docRef = doc(db, 'settings', 'brand');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setBrandSettings({ ...DEFAULT_BRAND_SETTINGS, ...docSnap.data() as BrandSettings });
-      } else {
-        // No brand settings saved yet — use defaults so canvas always renders
-        setBrandSettings(DEFAULT_BRAND_SETTINGS);
-      }
-    } catch (error) {
-      console.error("Failed to fetch brand settings", error);
+      const res = await fetchWithAuth('/api/settings/brand');
+      const data = await res.json();
+      setBrandSettings(data ? { ...DEFAULT_BRAND_SETTINGS, ...data } : DEFAULT_BRAND_SETTINGS);
+    } catch {
       setBrandSettings(DEFAULT_BRAND_SETTINGS);
     }
   };
@@ -154,26 +149,17 @@ export default function Editor() {
   const fetchArticle = async () => {
     setLoading(true);
     try {
-      const docRef = doc(db, 'news', articleId!);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setOriginalArticle(docSnap.data());
-      }
+      const res = await fetchWithAuth(`/api/news/articles/${articleId}`);
+      if (res.ok) setOriginalArticle(await res.json());
     } catch (error) {
-      console.error("Failed to fetch article", error);
+      console.error('Failed to fetch article', error);
     } finally {
       setLoading(false);
     }
   };
 
   const saveVersion = (en: any, ar: any) => {
-    const newVersion = {
-      timestamp: new Date().toISOString(),
-      en,
-      ar,
-      author: auth.currentUser?.email
-    };
-    setVersions(prev => [newVersion, ...prev]);
+    setVersions(prev => [{ timestamp: new Date().toISOString(), en, ar, author: user?.email || user?.username }, ...prev]);
   };
 
   const handleRewrite = async (target: 'all' | 'en' | 'ar' = 'all') => {
@@ -241,7 +227,12 @@ export default function Editor() {
   const handleSaveColor = async (color: string) => {
     setSavingColor(true);
     try {
-      await setDoc(doc(db, 'settings', 'brand'), { defaultAccentColor: color }, { merge: true });
+      // Merge the new accent color into existing brand settings
+      const merged = { ...(brandSettings || {}), defaultAccentColor: color };
+      await fetchWithAuth('/api/settings/brand', {
+        method: 'PUT',
+        body: JSON.stringify(merged),
+      });
       setBrandSettings(prev => prev ? { ...prev, defaultAccentColor: color } : prev);
       setSelectedExtractedColor(color);
     } catch (err) {
@@ -291,12 +282,9 @@ export default function Editor() {
   };
 
   const uploadCanvasForMetricool = async (dataUrl: string): Promise<string> => {
-    const token = await auth.currentUser?.getIdToken();
-    const filePath = `metricool-posts/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const res = await fetch('/api/upload-brand-asset', {
+    const res = await fetchWithAuth('/api/upload-brand-asset', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ dataUrl, filePath }),
+      body: JSON.stringify({ dataUrl }),
     });
     if (!res.ok) throw new Error('Failed to upload image for Metricool');
     const { url } = await res.json();
@@ -369,24 +357,28 @@ export default function Editor() {
         finalArBrandedUrl = await compressCanvasImage(arBrandedUrl);
       }
 
-      const docRef = await addDoc(collection(db, 'stories'), {
-        originalArticleId: articleId || null,
-        en: { headline: enHeadline, caption: enCaption, hashtags: enHashtags },
-        ar: { headline: arHeadline, caption: arCaption, hashtags: arHashtags },
-        imageUrl,
-        enBrandedUrl: finalEnBrandedUrl,
-        arBrandedUrl: finalArBrandedUrl,
-        format: selectedFormat,
-        status,
-        versions,
-        createdBy: auth.currentUser?.uid,
-        createdAt: serverTimestamp(),
+      const res = await fetchWithAuth('/api/stories', {
+        method: 'POST',
+        body: JSON.stringify({
+          news_id: articleId || null,
+          headline_en: enHeadline,
+          caption_en: enCaption,
+          hashtags_en: enHashtags,
+          headline_ar: arHeadline,
+          caption_ar: arCaption,
+          hashtags_ar: arHashtags,
+          image_url: imageUrl,
+          format: selectedFormat,
+          status,
+          created_by: user?.id,
+        }),
       });
-      
-      if (status === 'scheduled') {
-        navigate(`/publish/${docRef.id}`);
-      } else {
+      const data = await res.json();
+
+      if (status === 'draft') {
         navigate('/archive');
+      } else {
+        navigate(`/publish/${data.id}`);
       }
     } catch (error) {
       console.error("Save failed", error);

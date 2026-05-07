@@ -5,7 +5,7 @@ import {
   CheckCircle2, Clock, Send, Hash, Globe, FileText,
   ChevronDown, ChevronUp, Copy, Check, PenTool
 } from 'lucide-react';
-import { auth } from '../firebase';
+import { fetchWithAuth } from '../lib/api';
 import { Link } from 'react-router-dom';
 
 interface Story {
@@ -326,11 +326,7 @@ export default function Archive() {
   useEffect(() => {
     const fetchStories = async () => {
       try {
-        const token = await auth.currentUser?.getIdToken();
-        if (!token) { setLoading(false); return; }
-        const res = await fetch('/api/stories', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchWithAuth('/api/stories');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         // Sort by createdAt descending

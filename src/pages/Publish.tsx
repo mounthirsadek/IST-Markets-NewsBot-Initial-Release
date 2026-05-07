@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { 
-  ChevronLeft, Loader2, Instagram, Send, Calendar, 
+import {
+  ChevronLeft, Loader2, Instagram, Send, Calendar,
   CheckCircle2, AlertCircle, Globe, Hash, ShieldAlert,
   Link as LinkIcon, Sparkles, RefreshCw
 } from 'lucide-react';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { fetchWithAuth } from '../lib/api';
 import { generateSocialCaption, publishToInstagram, SocialPackage } from '../services/geminiService';
 
 interface CompanySettings {
@@ -25,14 +24,14 @@ interface CompanySettings {
 export default function Publish() {
   const { storyId } = useParams();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [story, setStory] = useState<any>(null);
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [socialPackage, setSocialPackage] = useState<SocialPackage | null>(null);
-  
+
   const [targetAccounts, setTargetAccounts] = useState({ en: true, ar: true });
   const [scheduledAt, setScheduledAt] = useState<string>('');
   const [publishStatus, setPublishStatus] = useState<{ [key: string]: { status: 'idle' | 'loading' | 'success' | 'error', error?: string, url?: string } }>({
@@ -49,25 +48,30 @@ export default function Publish() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const storyRef = doc(db, 'stories', storyId!);
-      const storySnap = await getDoc(storyRef);
-      
-      const settingsRef = doc(db, 'settings', 'company');
-      const settingsSnap = await getDoc(settingsRef);
-      
-      if (storySnap.exists()) {
-        setStory(storySnap.data());
+      const [storyRes, settingsRes] = await Promise.all([
+        fetchWithAuth(`/api/stories/${storyId}`),
+        fetchWithAuth('/api/settings/company'),
+      ]);
+
+      if (storyRes.ok) {
+        const storyData = await storyRes.json();
+        setStory(storyData);
         // If social package already exists in story, use it
-        if (storySnap.data().socialPackage) {
-          setSocialPackage(storySnap.data().socialPackage);
+        if (storyData.social_package) {
+          setSocialPackage(
+            typeof storyData.social_package === 'string'
+              ? JSON.parse(storyData.social_package)
+              : storyData.social_package
+          );
         }
       }
-      
-      if (settingsSnap.exists()) {
-        setSettings(settingsSnap.data() as CompanySettings);
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        setSettings(settingsData);
       }
     } catch (error) {
-      console.error("Failed to fetch data", error);
+      console.error('Failed to fetch data', error);
     } finally {
       setLoading(false);
     }
@@ -77,12 +81,18 @@ export default function Publish() {
     if (!story) return;
     setGenerating(true);
     try {
-      const pkg = await generateSocialCaption(story.en.headline, story.en.caption);
+      const pkg = await generateSocialCaption(
+        story.headline_en || story.headline,
+        story.caption_en || story.caption
+      );
       setSocialPackage(pkg);
       // Save to story
-      await updateDoc(doc(db, 'stories', storyId!), { socialPackage: pkg });
+      await fetchWithAuth(`/api/stories/${storyId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ social_package: pkg }),
+      });
     } catch (error) {
-      console.error("Caption generation failed", error);
+      console.error('Caption generation failed', error);
     } finally {
       setGenerating(false);
     }
@@ -91,8 +101,8 @@ export default function Publish() {
   const formatCaption = (lang: 'en' | 'ar', pkg: SocialPackage, settings: CompanySettings) => {
     const content = pkg[lang];
     const disclaimer = lang === 'en' ? settings.enDisclaimer : settings.arDisclaimer;
-    const hashtags = [...content.hashtags, ...settings.fixedHashtags].map(t => `#${t.replace('#', '')}`).join(' ');
-    
+    const hashtags = [...content.hashtags, ...(settings.fixedHashtags || [])].map(t => `#${t.replace('#', '')}`).join(' ');
+
     const links = `
 🌐 ${settings.websiteUrl}
 📢 ${settings.telegramUrl}
@@ -116,22 +126,24 @@ ${links}
 
   const handlePublish = async () => {
     if (!story || !settings || !socialPackage) return;
-    
+
     if (scheduledAt) {
       // Handle Scheduling
       setPublishing(true);
       try {
-        await updateDoc(doc(db, 'stories', storyId!), {
-          status: 'scheduled',
-          scheduledAt: new Date(scheduledAt),
-          targetAccounts,
-          // Store formatted captions for the server
-          enCaptionFinal: formatCaption('en', socialPackage, settings),
-          arCaptionFinal: formatCaption('ar', socialPackage, settings)
+        await fetchWithAuth(`/api/stories/${storyId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'scheduled',
+            scheduled_at: new Date(scheduledAt).toISOString(),
+            target_accounts: targetAccounts,
+            en_caption_final: formatCaption('en', socialPackage, settings),
+            ar_caption_final: formatCaption('ar', socialPackage, settings),
+          }),
         });
         navigate('/archive');
       } catch (error) {
-        console.error("Scheduling failed", error);
+        console.error('Scheduling failed', error);
       } finally {
         setPublishing(false);
       }
@@ -140,31 +152,28 @@ ${links}
 
     // Handle Immediate Publishing
     setPublishing(true);
-    
-    const accountsToPublish = [];
+
+    const accountsToPublish: Array<'en' | 'ar'> = [];
     if (targetAccounts.en) accountsToPublish.push('en');
     if (targetAccounts.ar) accountsToPublish.push('ar');
 
     for (const lang of accountsToPublish) {
       setPublishStatus(prev => ({ ...prev, [lang]: { status: 'loading' } }));
-      
-      const caption = formatCaption(lang as 'en' | 'ar', socialPackage, settings);
+
+      const caption = formatCaption(lang, socialPackage, settings);
       const instagramId = lang === 'en' ? settings.enInstagramId : settings.arInstagramId;
-      const imageUrl = lang === 'en' ? story.enBrandedUrl : story.arBrandedUrl;
+      // Use the single image_url for both language accounts
+      const imageUrl = story.image_url;
 
       try {
         const result = await publishToInstagram(imageUrl, caption, instagramId, settings.metaAccessToken);
-        
+
         if (result.success) {
           setPublishStatus(prev => ({ ...prev, [lang]: { status: 'success', url: `https://instagram.com/p/${result.postId}` } }));
           // Update story status
-          await updateDoc(doc(db, 'stories', storyId!), {
-            [`publishInfo.${lang}`]: {
-              postId: result.postId,
-              publishedAt: serverTimestamp(),
-              status: 'published'
-            },
-            status: 'published'
+          await fetchWithAuth(`/api/stories/${storyId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'published', published_at: new Date().toISOString() }),
           });
         } else {
           setPublishStatus(prev => ({ ...prev, [lang]: { status: 'error', error: result.error } }));
@@ -173,7 +182,7 @@ ${links}
         setPublishStatus(prev => ({ ...prev, [lang]: { status: 'error', error: String(error) } }));
       }
     }
-    
+
     setPublishing(false);
   };
 
@@ -201,14 +210,14 @@ ${links}
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
             <Calendar size={18} className="text-white/40" />
-            <input 
+            <input
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
               className="bg-transparent text-xs font-bold focus:outline-none"
             />
           </div>
-          <button 
+          <button
             onClick={handlePublish}
             disabled={publishing || !socialPackage}
             className="btn-primary flex items-center gap-2 disabled:opacity-50"
@@ -226,7 +235,7 @@ ${links}
             <div className="glass p-12 rounded-2xl text-center border-dashed border-white/10">
               <Sparkles className="mx-auto mb-4 text-white/20" size={48} />
               <p className="text-white/40 uppercase tracking-widest text-sm mb-6">Social captions not generated</p>
-              <button 
+              <button
                 onClick={handleGenerateCaptions}
                 className="btn-primary inline-flex items-center gap-2"
               >
@@ -259,8 +268,8 @@ ${links}
                       </span>
                     )}
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={targetAccounts.en}
                         onChange={(e) => setTargetAccounts({ ...targetAccounts, en: e.target.checked })}
                         className="rounded border-white/10 bg-white/5 text-[#f27d26] focus:ring-[#f27d26]"
@@ -272,7 +281,11 @@ ${links}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="aspect-square rounded-xl overflow-hidden border border-white/5">
-                    <img src={story.enBrandedUrl} className="w-full h-full object-cover" alt="EN Visual" />
+                    {story?.image_url ? (
+                      <img src={story.image_url} className="w-full h-full object-cover" alt="Visual" />
+                    ) : (
+                      <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/20 text-xs">No image</div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     <div className="bg-white/5 rounded-xl p-4 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto">
@@ -301,8 +314,8 @@ ${links}
                       </span>
                     )}
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={targetAccounts.ar}
                         onChange={(e) => setTargetAccounts({ ...targetAccounts, ar: e.target.checked })}
                         className="rounded border-white/10 bg-white/5 text-[#f27d26] focus:ring-[#f27d26]"
@@ -314,7 +327,11 @@ ${links}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="aspect-square rounded-xl overflow-hidden border border-white/5">
-                    <img src={story.arBrandedUrl} className="w-full h-full object-cover" alt="AR Visual" />
+                    {story?.image_url ? (
+                      <img src={story.image_url} className="w-full h-full object-cover" alt="Visual AR" />
+                    ) : (
+                      <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/20 text-xs">No image</div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     <div className="bg-white/5 rounded-xl p-4 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto text-right font-arabic" dir="rtl">
@@ -336,7 +353,7 @@ ${links}
         <div className="lg:col-span-4 space-y-6">
           <section className="glass p-6 rounded-2xl border-white/5 space-y-6">
             <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Publishing Status</h3>
-            
+
             <div className="space-y-4">
               {/* EN Status */}
               <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">

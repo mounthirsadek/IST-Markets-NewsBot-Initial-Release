@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Search, Filter, RefreshCw, ExternalLink, PenTool, CheckCircle2, XCircle, Sparkles, Plus, CalendarDays, Tag, Globe, X, Zap } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuthStore } from '../store';
 import { fetchWithAuth } from '../lib/api';
 import { MARKET_SYMBOLS, articleMentionsSymbol, CATEGORY_COLORS } from '../data/symbols';
@@ -76,25 +74,26 @@ export default function NewsFeed() {
 
   const { user } = useAuthStore();
 
-  useEffect(() => {
-    let unsubscribe = () => {};
-    
-    const startListener = () => {
-      if (!user) return;
-      
-      const q = query(collection(db, 'news'), orderBy('published_at_source', 'desc'));
-      unsubscribe = onSnapshot(q, (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NewsArticle));
-        setArticles(docs);
-        setLoading(false);
-      }, (error) => {
-        console.error("Firestore error:", error);
-        setLoading(false);
-      });
-    };
+  const loadArticles = async () => {
+    try {
+      const res = await fetchWithAuth('/api/news/articles');
+      if (res.ok) {
+        const docs = await res.json();
+        setArticles(Array.isArray(docs) ? docs : []);
+      }
+    } catch (e) {
+      console.error('News fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    startListener();
-    return () => unsubscribe();
+  useEffect(() => {
+    if (!user) return;
+    loadArticles();
+    // Poll every 30 seconds for new articles
+    const interval = setInterval(loadArticles, 30000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const handleFetch = async () => {
@@ -166,9 +165,13 @@ export default function NewsFeed() {
 
   const updateStatus = async (id: string, status: 'processed' | 'rejected') => {
     try {
-      await updateDoc(doc(db, 'news', id), { status });
+      await fetchWithAuth(`/api/news/articles/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      setArticles(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     } catch (error) {
-      console.error("Update failed", error);
+      console.error('Update failed', error);
     }
   };
 
@@ -176,24 +179,15 @@ export default function NewsFeed() {
     e.preventDefault();
     setLoading(true);
     try {
-      await addDoc(collection(db, 'news'), {
-        ...manualArticle,
-        published_at_source: new Date().toISOString(),
-        safety_status: 'safe',
-        status: 'pending',
-        createdAt: serverTimestamp()
+      await fetchWithAuth('/api/news/articles', {
+        method: 'POST',
+        body: JSON.stringify(manualArticle),
       });
       setShowManualModal(false);
-      setManualArticle({
-        headline: '',
-        article_body: '',
-        article_url: '',
-        source_name: 'Manual Entry',
-        theme: 'Market Update',
-        asset_tags: []
-      });
+      setManualArticle({ headline: '', article_body: '', article_url: '', source_name: 'Manual Entry', theme: 'Market Update', asset_tags: [] });
+      await loadArticles();
     } catch (error) {
-      console.error("Manual entry failed", error);
+      console.error('Manual entry failed', error);
     } finally {
       setLoading(false);
     }

@@ -1,32 +1,22 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+/**
+ * Firebase has been fully removed.
+ * Authentication is now handled via JWT + MySQL.
+ * Storage is now local disk via multer.
+ *
+ * This file is kept as a compatibility shim so any stray imports don't crash.
+ * All references to firebase should be replaced with API calls.
+ */
 
-const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+export const auth = null;
+export const db = null;
+export const storage = null;
+export const googleProvider = null;
+
+export const loginWithGoogle = async (): Promise<never> => {
+  throw new Error('Google login has been removed. Use username/password instead.');
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)');
-export const storage = getStorage(app);
-export const googleProvider = new GoogleAuthProvider();
-
-export const loginWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error) {
-    console.error("Error logging in with Google:", error);
-    throw error;
-  }
+export const logout = (): void => {
+  localStorage.removeItem('auth_token');
+  window.location.href = '/login';
 };
-
-export const logout = () => signOut(auth);
