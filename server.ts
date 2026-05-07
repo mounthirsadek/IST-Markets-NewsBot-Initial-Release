@@ -332,24 +332,26 @@ async function startServer() {
   //  AUTH ENDPOINTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // POST /api/auth/register
-  app.post('/api/auth/register', async (req: any, res: any) => {
-    const { username, password, email, name } = req.body;
+  // POST /api/users — admin-only user creation (public registration is disabled)
+  app.post('/api/users', checkAuth, checkRole(['admin', 'super-admin']), async (req: any, res: any) => {
+    const { username, password, email, name, role } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'username and password required' });
-
+    // Prevent privilege escalation: admin cannot create super-admin
+    if (req.user.role === 'admin' && role === 'super-admin')
+      return res.status(403).json({ error: 'Cannot assign super-admin role' });
     try {
       const hash = await bcrypt.hash(password, 12);
       const id   = randomUUID();
+      const assignedRole = role || 'viewer';
       await pool.query(
         'INSERT INTO users (id, username, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, username.trim(), email || null, hash, name || username, 'viewer']
+        [id, username.trim(), email || null, hash, name || username, assignedRole]
       );
-      const token = signJWT({ id, username, email: email || '', name: name || username, role: 'viewer' });
-      res.json({ token, user: { id, username, email, name, role: 'viewer' } });
+      await logAction(req.user.id, 'CREATE_USER', 'user', id, `Created user: ${username} (${assignedRole})`);
+      res.status(201).json({ id, username, email: email || null, name: name || username, role: assignedRole });
     } catch (e: any) {
       if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Username or email already exists' });
-      console.error('[Register]', e);
-      res.status(500).json({ error: 'Registration failed' });
+      res.status(500).json({ error: 'Failed to create user' });
     }
   });
 

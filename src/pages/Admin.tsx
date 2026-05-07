@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Users, Shield, ShieldCheck, ShieldAlert, Search,
-  Lock, Calendar, Trash2, X, Crown, Eye,
+  Lock, Calendar, Trash2, X, Crown, Eye, EyeOff,
   CheckCircle2, AlertTriangle, ChevronDown, Info,
-  RefreshCw,
+  RefreshCw, UserPlus, Loader2,
 } from 'lucide-react';
 import { fetchWithAuth } from '../lib/api';
 import { useAuthStore } from '../store';
@@ -71,6 +71,12 @@ export default function Admin() {
   const [showPerms, setShowPerms]       = useState(false);
   const [openRoleMenu, setOpenRoleMenu] = useState<string | null>(null);
 
+  // ── New User modal ───────────────────────────────────────────────────────────
+  const [showNewUser, setShowNewUser]   = useState(false);
+  const [newUser, setNewUser]           = useState({ username: '', email: '', name: '', password: '', role: 'viewer' as RoleKey });
+  const [creating, setCreating]         = useState(false);
+  const [showNewPw, setShowNewPw]       = useState(false);
+
   // ── Toast helpers ────────────────────────────────────────────────────────────
   const addToast = useCallback((type: Toast['type'], message: string) => {
     const id = Date.now();
@@ -129,6 +135,31 @@ export default function Admin() {
     } catch {
       setUsers(us => us.map(u => u.id === uid ? { ...u, role: prev! } : u));
       addToast('error', 'Network error');
+    }
+  };
+
+  // ── Create user ──────────────────────────────────────────────────────────────
+  const handleCreateUser = async () => {
+    if (!newUser.username.trim() || !newUser.password) {
+      addToast('error', 'Username and password are required');
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetchWithAuth('/api/users', {
+        method: 'POST',
+        body: JSON.stringify(newUser),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create user');
+      setShowNewUser(false);
+      setNewUser({ username: '', email: '', name: '', password: '', role: 'viewer' });
+      fetchUsers(true);
+      addToast('success', `User "${data.username}" created successfully`);
+    } catch (e: any) {
+      addToast('error', e.message);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -196,10 +227,17 @@ export default function Admin() {
           <button
             onClick={() => fetchUsers(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-[#f27d26]/10 border border-[#f27d26]/20 rounded-lg text-xs uppercase tracking-widest font-bold text-[#f27d26] hover:bg-[#f27d26]/20 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs uppercase tracking-widest font-bold text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
           >
             <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
             Refresh
+          </button>
+          <button
+            onClick={() => setShowNewUser(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#f27d26] hover:bg-[#f27d26]/80 rounded-lg text-xs uppercase tracking-widest font-bold text-black transition-colors"
+          >
+            <UserPlus size={13} />
+            New User
           </button>
         </div>
       </header>
@@ -543,6 +581,138 @@ export default function Admin() {
                   ) : (
                     <><Trash2 size={13} /> Remove</>
                   )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── New User Modal ──────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showNewUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={e => { if (e.target === e.currentTarget) setShowNewUser(false); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 12 }}
+              className="glass w-full max-w-md rounded-2xl border border-white/10 p-6 space-y-5"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserPlus size={16} className="text-[#f27d26]" />
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-white/60">Create New User</h3>
+                </div>
+                <button onClick={() => setShowNewUser(false)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+                  <X size={16} className="text-white/40" />
+                </button>
+              </div>
+
+              {/* Fields */}
+              <div className="space-y-3">
+                {/* Username */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Username <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={newUser.username}
+                    onChange={e => setNewUser(p => ({ ...p, username: e.target.value }))}
+                    placeholder="e.g. john.doe"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#f27d26]/50 placeholder-white/20"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Password <span className="text-red-400">*</span></label>
+                  <div className="relative">
+                    <input
+                      type={showNewPw ? 'text' : 'password'}
+                      value={newUser.password}
+                      onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))}
+                      placeholder="Min. 8 characters"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:border-[#f27d26]/50 placeholder-white/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPw(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                    >
+                      {showNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={newUser.name}
+                    onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))}
+                    placeholder="e.g. John Doe"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#f27d26]/50 placeholder-white/20"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newUser.email}
+                    onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))}
+                    placeholder="e.g. john@istmarkets.com"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#f27d26]/50 placeholder-white/20"
+                  />
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Role</label>
+                  <select
+                    value={newUser.role}
+                    onChange={e => setNewUser(p => ({ ...p, role: e.target.value as RoleKey }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#f27d26]/50 [color-scheme:dark]"
+                  >
+                    {ROLES
+                      .filter(([key]) => {
+                        // admin can't assign super-admin; super-admin can assign any role
+                        if (myRole === 'admin' && key === 'super-admin') return false;
+                        return true;
+                      })
+                      .map(([key, cfg]) => (
+                        <option key={key} value={key}>{cfg.label}</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowNewUser(false)}
+                  disabled={creating}
+                  className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateUser}
+                  disabled={creating || !newUser.username.trim() || !newUser.password}
+                  className="flex-1 px-4 py-2.5 bg-[#f27d26] hover:bg-[#f27d26]/80 rounded-xl text-sm font-bold text-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {creating
+                    ? <><Loader2 size={14} className="animate-spin" /> Creating…</>
+                    : <><UserPlus size={14} /> Create User</>}
                 </button>
               </div>
             </motion.div>
