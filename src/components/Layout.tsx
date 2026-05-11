@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap, TrendingUp, ChevronDown } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuthStore } from '../store';
+import { useBrandStore } from '../context/BrandContext';
+import { BRANDS } from '../data/brands';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,9 +27,13 @@ const navItems = [
 
 export default function Layout() {
   const { role, user, logout } = useAuthStore();
+  const { activeBrand, setActiveBrand } = useBrandStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [brandMenuOpen, setBrandMenuOpen] = useState(false);
+
+  const accent = activeBrand.accentColor;
 
   const handleLogout = () => {
     logout();
@@ -50,15 +56,47 @@ export default function Layout() {
         >
           <Menu size={22} />
         </button>
-        <h1 className="text-base font-bold tracking-tighter text-[#f27d26]">IST MARKETS</h1>
+
+        {/* Mobile brand selector */}
+        <div className="relative">
+          <button
+            onClick={() => setBrandMenuOpen(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+          >
+            <h1 className="text-sm font-bold tracking-tighter" style={{ color: accent }}>
+              {activeBrand.nameAr ?? activeBrand.name}
+            </h1>
+            {BRANDS.length > 1 && <ChevronDown size={12} className="opacity-50" />}
+          </button>
+          {brandMenuOpen && BRANDS.length > 1 && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[160px]">
+              {BRANDS.map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => { setActiveBrand(b.id); setBrandMenuOpen(false); }}
+                  className={cn(
+                    'w-full text-left px-4 py-3 text-sm transition-colors',
+                    b.id === activeBrand.id
+                      ? 'font-bold'
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                  )}
+                  style={b.id === activeBrand.id ? { color: b.accentColor } : undefined}
+                >
+                  {b.nameAr ?? b.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="w-9" />
       </div>
 
       {/* ── Backdrop ─────────────────────────────────────────── */}
-      {sidebarOpen && (
+      {(sidebarOpen || brandMenuOpen) && (
         <div
           className="fixed inset-0 bg-black/60 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => { setSidebarOpen(false); setBrandMenuOpen(false); }}
         />
       )}
 
@@ -81,9 +119,28 @@ export default function Layout() {
           </button>
         </div>
 
+        {/* Desktop brand header */}
         <div className="p-6 hidden md:block">
-          <h1 className="text-xl font-bold tracking-tighter text-[#f27d26]">IST MARKETS</h1>
+          <h1 className="text-xl font-bold tracking-tighter" style={{ color: accent }}>
+            {activeBrand.nameAr ?? activeBrand.name}
+          </h1>
           <p className="text-[10px] uppercase tracking-widest opacity-50">NewsBot v1.0</p>
+
+          {/* Desktop brand selector */}
+          {BRANDS.length > 1 && (
+            <select
+              value={activeBrand.id}
+              onChange={(e) => setActiveBrand(e.target.value)}
+              className="mt-3 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/70 focus:outline-none cursor-pointer appearance-none"
+              style={{ borderColor: accent + '40' }}
+            >
+              {BRANDS.map(b => (
+                <option key={b.id} value={b.id} className="bg-[#1a1a1a]">
+                  {b.nameAr ? `${b.nameAr} — ${b.name}` : b.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto py-2">
@@ -97,9 +154,10 @@ export default function Layout() {
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
                   isActive
-                    ? "bg-[#f27d26] text-black font-semibold"
+                    ? "text-black font-semibold"
                     : "text-white/60 hover:text-white hover:bg-white/5"
                 )}
+                style={isActive ? { backgroundColor: accent } : undefined}
               >
                 <item.icon size={20} />
                 <span>{item.label}</span>
@@ -110,7 +168,10 @@ export default function Layout() {
 
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 px-4 py-3 mb-2">
-            <div className="w-8 h-8 rounded-full border border-white/20 bg-[#f27d26]/20 flex items-center justify-center text-[#f27d26] font-bold text-sm shrink-0">
+            <div
+              className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center font-bold text-sm shrink-0"
+              style={{ backgroundColor: accent + '33', color: accent, borderColor: accent + '50' }}
+            >
               {(user?.name || user?.username || 'U')[0].toUpperCase()}
             </div>
             <div className="overflow-hidden min-w-0">

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { fetchWithAuth } from '../lib/api';
 import { generateSocialCaption, publishToInstagram, SocialPackage } from '../services/geminiService';
+import { useBrandStore } from '../context/BrandContext';
 
 interface CompanySettings {
   enDisclaimer: string;
@@ -24,6 +25,7 @@ interface CompanySettings {
 export default function Publish() {
   const { storyId } = useParams();
   const navigate = useNavigate();
+  const { activeBrand } = useBrandStore();
 
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -38,6 +40,8 @@ export default function Publish() {
     en: { status: 'idle' },
     ar: { status: 'idle' }
   });
+  const [telegramStatus, setTelegramStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [telegramError, setTelegramError] = useState<string | null>(null);
 
   useEffect(() => {
     if (storyId) {
@@ -122,6 +126,38 @@ ${links}
 
 ⚠️ ${disclaimer}
     `.trim();
+  };
+
+  const handlePublishTelegram = async () => {
+    if (!story || !socialPackage) return;
+    setTelegramStatus('loading');
+    setTelegramError(null);
+    try {
+      const ar = socialPackage.ar;
+      const caption = ar
+        ? `${ar.hook}\n\n${ar.summary}\n\n${ar.cta}\n\n${ar.hashtags.map(h => `#${h.replace('#', '')}`).join(' ')}`
+        : (socialPackage.en?.hook ?? '');
+      const res = await fetchWithAuth('/api/telegram/send', {
+        method: 'POST',
+        body: JSON.stringify({
+          imageUrl: story.image_url,
+          caption,
+          brandId: story.brand_id ?? activeBrand.id,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Telegram publish failed');
+      }
+      setTelegramStatus('success');
+      await fetchWithAuth(`/api/stories/${storyId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'published', published_at: new Date().toISOString() }),
+      });
+    } catch (e: any) {
+      setTelegramStatus('error');
+      setTelegramError(e.message);
+    }
   };
 
   const handlePublish = async () => {
@@ -345,6 +381,64 @@ ${links}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── Telegram Publishing (Marsad Al Souq) ─────────────────────── */}
+          {activeBrand.telegramEnabled && socialPackage && (
+            <div className="glass p-8 rounded-2xl border border-blue-500/20 space-y-6">
+              <div className="flex items-center gap-3">
+                <Send size={18} className="text-blue-400" />
+                <h3 className="font-bold uppercase tracking-widest text-sm text-blue-300">Telegram Channel</h3>
+                <span className="text-[9px] px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 rounded text-blue-400 font-bold uppercase">
+                  {activeBrand.nameAr ?? activeBrand.name}
+                </span>
+              </div>
+
+              <div className="text-[10px] text-white/40 leading-relaxed">
+                Send the Arabic social caption + story image directly to the Telegram channel.
+              </div>
+
+              {story?.image_url && (
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                    <img src={story.image_url} className="w-full h-full object-cover" alt="Story" />
+                  </div>
+                  <div className="text-xs text-white/50 font-mono line-clamp-3" dir="rtl">
+                    {socialPackage.ar?.hook}
+                  </div>
+                </div>
+              )}
+
+              {telegramStatus === 'success' && (
+                <div className="flex items-center gap-2 text-green-400 text-sm font-bold">
+                  <CheckCircle2 size={16} /> Sent to Telegram successfully!
+                </div>
+              )}
+              {telegramStatus === 'error' && telegramError && (
+                <div className="p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle size={14} /> {telegramError}
+                </div>
+              )}
+
+              {telegramStatus !== 'success' && (
+                <button
+                  onClick={handlePublishTelegram}
+                  disabled={telegramStatus === 'loading' || !story?.image_url}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {telegramStatus === 'loading'
+                    ? <><Loader2 className="animate-spin" size={16} /> Sending...</>
+                    : <><Send size={16} /> Send to Telegram</>
+                  }
+                </button>
+              )}
+
+              {!story?.image_url && (
+                <p className="text-[10px] text-amber-400/70 flex items-center gap-1">
+                  <AlertCircle size={11} /> Image must be uploaded (not a data URI) before Telegram publishing.
+                </p>
+              )}
             </div>
           )}
         </div>

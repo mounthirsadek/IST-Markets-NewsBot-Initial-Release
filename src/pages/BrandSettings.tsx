@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Palette, Save, Upload, Layout, Type, Info, CheckCircle2, Loader2 } from 'lucide-react';
 import { fetchWithAuth } from '../lib/api';
 import { motion } from 'framer-motion';
+import { useBrandStore } from '../context/BrandContext';
 
 interface BrandSettings {
   logoUrl: string;
@@ -16,48 +17,64 @@ interface BrandSettings {
   isActive: boolean;
 }
 
-const DEFAULT_SETTINGS: BrandSettings = {
-  logoUrl: 'https://ais-dev-kdcuv573zwlik2eo6p72cv-73901879866.europe-west2.run.app/logo.png', // Placeholder
+const buildDefaults = (accentColor: string, fixedTagline: string, footerDisclaimer: string, backgroundStyle: string): BrandSettings => ({
+  logoUrl: '',
   logoPosition: 'top-left',
   logoSize: 120,
-  backgroundStyle: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+  backgroundStyle,
   backgroundImageUrl: '',
-  fixedTagline: 'IST MARKETS | Institutional Grade Analysis',
-  footerDisclaimer: 'Trading involves risk. Past performance is not indicative of future results.',
+  fixedTagline,
+  footerDisclaimer,
   footerDisclaimer2: '',
-  defaultAccentColor: '#f27d26',
+  defaultAccentColor: accentColor,
   isActive: true,
-};
+});
 
 export default function BrandSettingsPage() {
-  const [settings, setSettings] = useState<BrandSettings>(DEFAULT_SETTINGS);
+  const { activeBrand } = useBrandStore();
+  const [settings, setSettings] = useState<BrandSettings>(
+    buildDefaults(activeBrand.accentColor, activeBrand.defaults.fixedTagline, activeBrand.defaults.footerDisclaimer, activeBrand.defaults.backgroundStyle)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Re-fetch when active brand changes
   useEffect(() => {
+    setLoading(true);
+    const defaults = buildDefaults(
+      activeBrand.accentColor,
+      activeBrand.defaults.fixedTagline,
+      activeBrand.defaults.footerDisclaimer,
+      activeBrand.defaults.backgroundStyle
+    );
+    setSettings(defaults);
+
     const fetchSettings = async () => {
       try {
-        const res = await fetchWithAuth('/api/settings/brand');
+        const res = await fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`);
         const data = await res.json();
         if (data) setSettings(s => ({ ...s, ...data }));
       } catch (error) {
-        console.error("Error fetching brand settings:", error);
+        console.error('Error fetching brand settings:', error);
       } finally {
         setLoading(false);
       }
     };
     fetchSettings();
-  }, []);
+  }, [activeBrand.id]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchWithAuth('/api/settings/brand', { method: 'PUT', body: JSON.stringify(settings) });
+      await fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`, {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      console.error("Error saving brand settings:", error);
+      console.error('Error saving brand settings:', error);
     } finally {
       setSaving(false);
     }
@@ -90,13 +107,10 @@ export default function BrandSettingsPage() {
           const ctx = canvas.getContext('2d')!;
 
           if (keepTransparency) {
-            // Keep canvas transparent — draw image directly (preserves alpha channel)
             ctx.clearRect(0, 0, w, h);
             ctx.drawImage(img, 0, 0, w, h);
-            // PNG: no quality loop, just resize
             resolve(canvas.toDataURL('image/png'));
           } else {
-            // JPEG: fill white bg first, then compress with quality loop
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, w, h);
             ctx.drawImage(img, 0, 0, w, h);
@@ -120,7 +134,6 @@ export default function BrandSettingsPage() {
     if (!file) return;
     setSaving(true);
     try {
-      // keepTransparency=true → saves as PNG → no black background on transparent logos
       const compressed = await compressImage(file, 300, 600, true);
       setSettings(prev => ({ ...prev, logoUrl: compressed }));
     } catch (err) {
@@ -144,10 +157,12 @@ export default function BrandSettingsPage() {
     }
   };
 
+  const accent = activeBrand.accentColor;
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#f27d26]" size={32} />
+        <Loader2 className="animate-spin" style={{ color: accent }} size={32} />
       </div>
     );
   }
@@ -157,12 +172,15 @@ export default function BrandSettingsPage() {
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-4xl font-bold tracking-tighter">Brand Identity</h2>
-          <p className="text-white/40 uppercase tracking-widest text-xs mt-1">Configure your visual DNA</p>
+          <p className="text-white/40 uppercase tracking-widest text-xs mt-1">
+            {activeBrand.nameAr ?? activeBrand.name}
+          </p>
         </div>
-        <button 
+        <button
           onClick={handleSave}
           disabled={saving}
-          className="btn-primary flex items-center gap-2 px-8"
+          className="flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-black transition-all"
+          style={{ backgroundColor: accent }}
         >
           {saving ? <Loader2 className="animate-spin" size={18} /> : (success ? <CheckCircle2 size={18} /> : <Save size={18} />)}
           {saving ? 'Saving...' : (success ? 'Saved!' : 'Save Identity')}
@@ -174,14 +192,14 @@ export default function BrandSettingsPage() {
         <div className="lg:col-span-7 space-y-8">
           {/* Logo Section */}
           <section className="glass p-6 rounded-2xl border-white/5 space-y-6">
-            <div className="flex items-center gap-3 text-[#f27d26]">
+            <div className="flex items-center gap-3" style={{ color: accent }}>
               <Upload size={20} />
               <h3 className="font-bold uppercase tracking-widest text-sm">Logo & Assets</h3>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-white/40">Company Logo</label>
+                <label className="text-[10px] uppercase tracking-widest text-white/40">Brand Logo</label>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center overflow-hidden">
                     {settings.logoUrl ? (
@@ -199,10 +217,11 @@ export default function BrandSettingsPage() {
 
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest text-white/40">Logo Position</label>
-                <select 
+                <select
                   value={settings.logoPosition}
                   onChange={(e) => setSettings({...settings, logoPosition: e.target.value as any})}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#f27d26]"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none"
+                  style={{ '--tw-ring-color': accent } as any}
                 >
                   <option value="top-left">Top Left</option>
                   <option value="top-center">Top Center</option>
@@ -215,28 +234,28 @@ export default function BrandSettingsPage() {
 
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest text-white/40">Logo Size (px)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   value={settings.logoSize}
                   onChange={(e) => setSettings({...settings, logoSize: parseInt(e.target.value)})}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#f27d26]"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest text-white/40">Accent Color</label>
                 <div className="flex gap-2">
-                  <input 
-                    type="color" 
+                  <input
+                    type="color"
                     value={settings.defaultAccentColor}
                     onChange={(e) => setSettings({...settings, defaultAccentColor: e.target.value})}
                     className="w-10 h-10 bg-transparent border-none cursor-pointer"
                   />
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={settings.defaultAccentColor}
                     onChange={(e) => setSettings({...settings, defaultAccentColor: e.target.value})}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#f27d26]"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none"
                   />
                 </div>
               </div>
@@ -245,7 +264,7 @@ export default function BrandSettingsPage() {
 
           {/* Typography Section */}
           <section className="glass p-6 rounded-2xl border-white/5 space-y-6">
-            <div className="flex items-center gap-3 text-[#f27d26]">
+            <div className="flex items-center gap-3" style={{ color: accent }}>
               <Type size={20} />
               <h3 className="font-bold uppercase tracking-widest text-sm">Typography & Copy</h3>
             </div>
@@ -253,12 +272,13 @@ export default function BrandSettingsPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest text-white/40">Fixed Tagline</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={settings.fixedTagline}
                   onChange={(e) => setSettings({...settings, fixedTagline: e.target.value})}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#f27d26]"
-                  placeholder="e.g. IST MARKETS | Institutional Grade Analysis"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none"
+                  placeholder={activeBrand.defaults.fixedTagline}
+                  dir={activeBrand.language === 'ar' ? 'rtl' : 'ltr'}
                 />
               </div>
 
@@ -270,8 +290,9 @@ export default function BrandSettingsPage() {
                   value={settings.footerDisclaimer}
                   onChange={(e) => setSettings({...settings, footerDisclaimer: e.target.value})}
                   rows={2}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] resize-none"
-                  placeholder="e.g. Trading involves risk. Past performance is not indicative of future results."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none resize-none"
+                  placeholder={activeBrand.defaults.footerDisclaimer}
+                  dir={activeBrand.language === 'ar' ? 'rtl' : 'ltr'}
                 />
               </div>
 
@@ -283,8 +304,8 @@ export default function BrandSettingsPage() {
                   value={settings.footerDisclaimer2}
                   onChange={(e) => setSettings({...settings, footerDisclaimer2: e.target.value})}
                   rows={2}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#f27d26] resize-none"
-                  placeholder="e.g. CFDs are complex instruments and carry a high risk of losing money."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none resize-none"
+                  dir={activeBrand.language === 'ar' ? 'rtl' : 'ltr'}
                 />
               </div>
             </div>
@@ -292,16 +313,15 @@ export default function BrandSettingsPage() {
 
           {/* Background Section */}
           <section className="glass p-6 rounded-2xl border-white/5 space-y-6">
-            <div className="flex items-center gap-3 text-[#f27d26]">
+            <div className="flex items-center gap-3" style={{ color: accent }}>
               <Layout size={20} />
               <h3 className="font-bold uppercase tracking-widest text-sm">Canvas Layout</h3>
             </div>
 
-            {/* Background Image Upload */}
             <div className="space-y-3">
               <label className="text-[10px] uppercase tracking-widest text-white/40">Background Template Image</label>
               <p className="text-[10px] text-white/30 leading-relaxed">
-                Upload a branded image (e.g. your purple IST Markets template). When set, this replaces the CSS gradient and AI-generated image on the canvas.
+                Upload a branded background image. When set, it layers behind the AI-generated story image.
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-24 h-24 bg-white/5 rounded-lg border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
@@ -312,7 +332,10 @@ export default function BrandSettingsPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="cursor-pointer px-4 py-2 bg-[#f27d26]/20 hover:bg-[#f27d26]/30 border border-[#f27d26]/40 rounded-lg text-xs font-bold text-[#f27d26] transition-all">
+                  <label
+                    className="cursor-pointer px-4 py-2 rounded-lg text-xs font-bold transition-all border"
+                    style={{ backgroundColor: accent + '22', borderColor: accent + '44', color: accent }}
+                  >
                     Upload Template Image
                     <input type="file" className="hidden" onChange={handleBackgroundUpload} accept="image/*" />
                   </label>
@@ -335,7 +358,7 @@ export default function BrandSettingsPage() {
                 type="text"
                 value={settings.backgroundStyle}
                 onChange={(e) => setSettings({...settings, backgroundStyle: e.target.value})}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-[#f27d26]"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none"
               />
             </div>
           </section>
@@ -344,9 +367,12 @@ export default function BrandSettingsPage() {
         {/* Preview Panel */}
         <div className="lg:col-span-5 space-y-6">
           <div className="sticky top-8 space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Live Preview (Post)</h3>
-            
-            <div className="aspect-square w-full rounded-2xl overflow-hidden relative shadow-2xl border border-white/10" style={{ background: settings.backgroundImageUrl ? 'transparent' : settings.backgroundStyle }}>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white/40">Live Preview</h3>
+
+            <div
+              className="aspect-square w-full rounded-2xl overflow-hidden relative shadow-2xl border border-white/10"
+              style={{ background: settings.backgroundImageUrl ? 'transparent' : settings.backgroundStyle }}
+            >
               {settings.backgroundImageUrl && (
                 <>
                   <img src={settings.backgroundImageUrl} className="absolute inset-0 w-full h-full object-cover" alt="Brand background" />
@@ -369,10 +395,14 @@ export default function BrandSettingsPage() {
               <div className="absolute top-1/2 left-0 w-full text-center -translate-y-1/2 px-12">
                 <div className="w-12 h-1 mb-4 mx-auto" style={{ backgroundColor: settings.defaultAccentColor }} />
                 <h4 className="text-2xl font-bold tracking-tighter leading-tight mb-2">
-                  MARKET HEADLINE<br/>
-                  <span style={{ color: settings.defaultAccentColor }}>GOES HERE</span>
+                  {activeBrand.language === 'ar' ? 'عنوان الخبر' : 'MARKET HEADLINE'}<br/>
+                  <span style={{ color: settings.defaultAccentColor }}>
+                    {activeBrand.language === 'ar' ? 'يظهر هنا' : 'GOES HERE'}
+                  </span>
                 </h4>
-                <p className="text-[10px] uppercase tracking-[0.3em] font-bold opacity-50">{settings.fixedTagline}</p>
+                <p className="text-[10px] uppercase tracking-[0.3em] font-bold opacity-50">
+                  {settings.fixedTagline}
+                </p>
               </div>
 
               {/* Footer Overlay */}
@@ -391,9 +421,9 @@ export default function BrandSettingsPage() {
             </div>
 
             <div className="glass p-4 rounded-xl border-white/5 flex items-start gap-3">
-              <Info size={16} className="text-[#f27d26] shrink-0 mt-0.5" />
+              <Info size={16} className="shrink-0 mt-0.5" style={{ color: accent }} />
               <p className="text-[10px] text-white/40 leading-relaxed uppercase tracking-wider">
-                This preview shows the fixed elements of your brand template. 
+                This preview shows the fixed elements of your brand template.
                 Dynamic content like story headlines and AI visuals will be composited during the editorial process.
               </p>
             </div>

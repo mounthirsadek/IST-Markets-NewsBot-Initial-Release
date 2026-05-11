@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import marsadIconUrl from '../assets/marsad-icon.svg';
 
 interface BrandedCanvasProps {
   backgroundImage: string | null;
@@ -14,6 +15,7 @@ interface BrandedCanvasProps {
   language: 'en' | 'ar';
   width?: number;
   height?: number;
+  brandId?: string;
   onExport?: (dataUrl: string) => void;
 }
 
@@ -40,6 +42,225 @@ const coverFit = (img: HTMLImageElement, cw: number, ch: number) => {
   return { dw, dh, dx, dy };
 };
 
+/** Draw a rounded rectangle path (does NOT fill or stroke — caller does that) */
+const roundedRectPath = (
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number
+) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y,     x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h,     x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y,         x + r, y);
+  ctx.closePath();
+};
+
+// ── Marsad Al Souq canvas renderer ─────────────────────────────────────────
+async function renderMarsad(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  props: BrandedCanvasProps
+) {
+  const { storyImage, headline, logoUrl } = props;
+  const gold  = '#C9A84C';
+  const gold2 = '#E8C574';
+  const frame = 10;
+  const cardX = frame, cardY = frame;
+  const cardW = width  - frame * 2;
+  const cardH = height - frame * 2;
+  const pad   = 44;
+
+  // Pre-load Cairo so canvas text renders correctly
+  try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
+
+  // ── OUTER MATTE ──────────────────────────────────────────────────────────
+  ctx.fillStyle = '#070E1A';
+  ctx.fillRect(0, 0, width, height);
+
+  // ── INNER CARD (clip) ─────────────────────────────────────────────────────
+  ctx.save();
+  roundedRectPath(ctx, cardX, cardY, cardW, cardH, 14);
+  ctx.clip();
+
+  // Navy gradient background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+  bgGrad.addColorStop(0,   '#152035');
+  bgGrad.addColorStop(0.5, '#0D1B2A');
+  bgGrad.addColorStop(1,   '#070E1A');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(cardX, cardY, cardW, cardH);
+
+  // ── STORY IMAGE (middle zone) ─────────────────────────────────────────────
+  const imgZoneY = cardY + 145;
+  const imgZoneH = Math.round(cardH * 0.52);
+
+  if (storyImage) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cardX, imgZoneY, cardW, imgZoneH);
+    ctx.clip();
+    const img = await loadImg(storyImage);
+    if (img.width > 0) {
+      const { dw, dh, dx, dy } = coverFit(img, cardW, imgZoneH);
+      ctx.drawImage(img, cardX + dx, imgZoneY + dy, dw, dh);
+    }
+    ctx.restore();
+
+    // Fade-out gradient at bottom of image (into text area)
+    const fadeGrad = ctx.createLinearGradient(0, imgZoneY + imgZoneH * 0.55, 0, imgZoneY + imgZoneH);
+    fadeGrad.addColorStop(0, 'rgba(10,20,34,0)');
+    fadeGrad.addColorStop(1, 'rgba(10,20,34,0.97)');
+    ctx.fillStyle = fadeGrad;
+    ctx.fillRect(cardX, imgZoneY, cardW, imgZoneH);
+  }
+
+  ctx.restore(); // end card clip
+
+  // ── SCOPE ICON (top-right of card) ───────────────────────────────────────
+  const iconSize = 52;
+  const iconX = cardX + cardW - pad - iconSize;
+  const iconY = cardY + 28;
+  const iconImg = await loadImg(marsadIconUrl);
+  if (iconImg.width > 0) {
+    ctx.save();
+    roundedRectPath(ctx, iconX, iconY, iconSize, iconSize, 10);
+    ctx.clip();
+    ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
+    ctx.restore();
+  }
+
+  // ── HEADER: brand name ────────────────────────────────────────────────────
+  ctx.save();
+  ctx.shadowColor   = 'rgba(0,0,0,0.8)';
+  ctx.shadowBlur    = 14;
+  ctx.font          = `900 ${Math.round(width * 0.052)}px Cairo, Arial, sans-serif`;
+  ctx.direction     = 'rtl';
+  ctx.textAlign     = 'right';
+  ctx.textBaseline  = 'top';
+  ctx.fillStyle     = gold;
+  ctx.fillText('مرصد السوق', cardX + cardW - pad, cardY + 34);
+  ctx.restore();
+
+  // Thin gold rule under header
+  const ruleY = cardY + 34 + Math.round(width * 0.052) * 1.1 + 8;
+  ctx.strokeStyle = gold + '40';
+  ctx.lineWidth   = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(cardX + pad, ruleY);
+  ctx.lineTo(cardX + cardW - pad, ruleY);
+  ctx.stroke();
+
+  // ── HEADLINE ─────────────────────────────────────────────────────────────
+  const headlineStartY = imgZoneY + imgZoneH - 20;
+  const fontSize  = Math.round(width * 0.062);
+  const lineH     = fontSize * 1.26;
+  const maxLineW  = cardW - pad * 2;
+
+  ctx.font          = `700 ${fontSize}px Cairo, Arial, sans-serif`;
+  ctx.direction     = 'rtl';
+  ctx.textAlign     = 'right';
+  ctx.textBaseline  = 'top';
+
+  // Word-wrap
+  const words = headline.split(' ');
+  const lines: string[] = [];
+  let cur = '';
+  for (const word of words) {
+    const test = cur ? cur + ' ' + word : word;
+    if (ctx.measureText(test).width > maxLineW && cur) {
+      lines.push(cur);
+      cur = word;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+
+  ctx.shadowColor   = 'rgba(0,0,0,0.92)';
+  ctx.shadowBlur    = 24;
+  ctx.shadowOffsetY = 3;
+
+  lines.forEach((line, i) => {
+    ctx.fillStyle = (i === lines.length - 1 && lines.length > 1) ? gold : '#ffffff';
+    ctx.fillText(line, cardX + cardW - pad, headlineStartY + i * lineH);
+  });
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur  = 0;
+  ctx.shadowOffsetY = 0;
+
+  // ── GOLD ACCENT BAR below headline ───────────────────────────────────────
+  const barY  = headlineStartY + lines.length * lineH + fontSize * 0.4;
+  const barW  = cardW * 0.07;
+  const barH  = height * 0.004;
+  ctx.fillStyle = gold;
+  ctx.fillRect(cardX + cardW - pad - barW, barY, barW, barH);
+
+  // ── FOOTER ───────────────────────────────────────────────────────────────
+  const footerY = cardY + cardH - 110;
+  const footerH = 100;
+
+  // Subtle footer separator
+  const footerGrad = ctx.createLinearGradient(0, footerY - 30, 0, footerY);
+  footerGrad.addColorStop(0, 'rgba(10,20,34,0)');
+  footerGrad.addColorStop(1, 'rgba(10,20,34,0.55)');
+  ctx.fillStyle = footerGrad;
+  ctx.fillRect(cardX, footerY - 30, cardW, 30);
+
+  ctx.strokeStyle = gold + '28';
+  ctx.lineWidth   = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(cardX + pad, footerY);
+  ctx.lineTo(cardX + cardW - pad, footerY);
+  ctx.stroke();
+
+  // Date — right side (Arabic locale)
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
+  ctx.font         = `400 ${Math.round(width * 0.020)}px Cairo, Arial, sans-serif`;
+  ctx.direction    = 'rtl';
+  ctx.textAlign    = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = 'rgba(255,255,255,0.55)';
+  ctx.fillText(dateStr, cardX + cardW - pad, footerY + footerH * 0.38);
+
+  // IST Markets logo — center
+  if (logoUrl) {
+    const logo = await loadImg(logoUrl);
+    if (logo.width > 0) {
+      const logoH2 = 36;
+      const logoW2 = (logo.width / logo.height) * logoH2;
+      ctx.save();
+      ctx.globalAlpha = 0.80;
+      ctx.drawImage(logo, cardX + (cardW - logoW2) / 2, footerY + (footerH - logoH2) / 2, logoW2, logoH2);
+      ctx.restore();
+    }
+  }
+
+  // "بدعم من" — left side
+  ctx.font         = `400 ${Math.round(width * 0.019)}px Cairo, Arial, sans-serif`;
+  ctx.direction    = 'ltr';
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = 'rgba(255,255,255,0.32)';
+  ctx.fillText('بدعم من IST Markets', cardX + pad, footerY + footerH * 0.62);
+
+  // ── CARD BORDER (subtle gold glow) ────────────────────────────────────────
+  ctx.save();
+  roundedRectPath(ctx, cardX, cardY, cardW, cardH, 14);
+  ctx.strokeStyle = gold2 + '22';
+  ctx.lineWidth   = 1.2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
 export default function BrandedCanvas({
   backgroundImage,
   storyImage,
@@ -54,6 +275,7 @@ export default function BrandedCanvas({
   language,
   width = 1080,
   height = 1080,
+  brandId,
   onExport
 }: BrandedCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,18 +287,29 @@ export default function BrandedCanvas({
     if (!ctx) return;
 
     const render = async () => {
+      // ── Marsad Al Souq theme ──────────────────────────────────────────────
+      if (brandId === 'marsad-alsouq') {
+        await renderMarsad(ctx, width, height, {
+          backgroundImage, storyImage, headline, accentColor,
+          logoUrl, logoSize, logoPosition, tagline,
+          disclaimer, disclaimer2, language, width, height, brandId, onExport,
+        });
+        if (onExport) onExport(canvas.toDataURL('image/jpeg', 0.92));
+        return;
+      }
+
+      // ── IST Markets (default) theme ───────────────────────────────────────
       const pad     = width * 0.06;
       const isRTL   = language === 'ar';
       const textX   = isRTL ? width - pad : pad;
       const footerH = height * 0.12;
       const footerY = height - footerH;
-      const stripeW = Math.max(4, width * 0.004);
 
-      // ── LAYER 1: Dark base ─────────────────────────────────────────
+      // LAYER 1: Dark base
       ctx.fillStyle = '#111114';
       ctx.fillRect(0, 0, width, height);
 
-      // ── LAYER 2: AI Story Image — FULL BLEED ──────────────────────
+      // LAYER 2: AI Story Image — FULL BLEED
       if (storyImage) {
         const img = await loadImg(storyImage);
         if (img.width > 0) {
@@ -85,7 +318,7 @@ export default function BrandedCanvas({
         }
       }
 
-      // ── LAYER 3: Brand Template (tint or fallback) ─────────────────
+      // LAYER 3: Brand Template (tint or fallback)
       if (backgroundImage) {
         const img = await loadImg(backgroundImage);
         if (img.width > 0) {
@@ -101,9 +334,7 @@ export default function BrandedCanvas({
         }
       }
 
-      // ── LAYER 4: Gradients ─────────────────────────────────────────
-
-      // 4A — Top gradient: covers text area (lightened for less dark header)
+      // LAYER 4: Gradients
       const ar = width / height;
       const textAreaBottom = ar > 1.3 ? height * 0.58 : height * 0.44;
       const topGrad = ctx.createLinearGradient(0, 0, 0, textAreaBottom);
@@ -114,7 +345,6 @@ export default function BrandedCanvas({
       ctx.fillStyle = topGrad;
       ctx.fillRect(0, 0, width, textAreaBottom);
 
-      // 4B — Bottom gradient: smooth fade to bottom covering footer area too
       const botGrad = ctx.createLinearGradient(0, height * 0.70, 0, height);
       botGrad.addColorStop(0,    'rgba(0,0,0,0.00)');
       botGrad.addColorStop(0.45, 'rgba(0,0,0,0.40)');
@@ -122,7 +352,6 @@ export default function BrandedCanvas({
       ctx.fillStyle = botGrad;
       ctx.fillRect(0, height * 0.70, width, height - height * 0.70);
 
-      // 4C — Subtle radial vignette (corners dark, center bright)
       const vig = ctx.createRadialGradient(
         width / 2, height * 0.60, height * 0.28,
         width / 2, height * 0.60, height * 0.90
@@ -132,9 +361,7 @@ export default function BrandedCanvas({
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, width, height);
 
-      // ── LAYER 5: Vertical accent stripe — removed ──────────────────
-
-      // ── LAYER 6: Logo ───────────────────────────────────────────────
+      // LAYER 5: Logo
       if (logoUrl) {
         const logo = await loadImg(logoUrl);
         if (logo.width > 0) {
@@ -156,15 +383,13 @@ export default function BrandedCanvas({
         }
       }
 
-      // ── LAYER 7: Headline (upper third) ────────────────────────────
-      // Scale font by the shorter dimension so landscape formats don't overflow
+      // LAYER 6: Headline (upper third)
       const aspectRatio = width / height;
       const baseDim  = aspectRatio > 1.3
-        ? Math.min(width, height * 1.3)   // landscape: scale down to avoid overflow
-        : width;                           // portrait / square: normal
+        ? Math.min(width, height * 1.3)
+        : width;
       const fontSize   = baseDim * 0.062;
       const lineH      = fontSize * 1.22;
-      // Landscape formats start headline higher (canvas is short)
       const headlineY  = aspectRatio > 1.3 ? height * 0.12 : height * 0.17;
       const maxLineW   = width - pad * 2;
 
@@ -173,7 +398,6 @@ export default function BrandedCanvas({
       ctx.textAlign    = isRTL ? 'right' : 'left';
       ctx.textBaseline = 'top';
 
-      // Word-wrap
       const words = headline.split(' ');
       const lines: string[] = [];
       let cur = '';
@@ -188,14 +412,12 @@ export default function BrandedCanvas({
       }
       if (cur) lines.push(cur);
 
-      // Strong text shadow for readability over any image
       ctx.shadowColor   = 'rgba(0,0,0,0.90)';
       ctx.shadowBlur    = 22;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 3;
 
       lines.forEach((line, i) => {
-        // Last line uses accent color for visual punch (Bloomberg/Reuters style)
         ctx.fillStyle = (i === lines.length - 1 && lines.length > 1)
           ? accentColor
           : '#ffffff';
@@ -207,7 +429,7 @@ export default function BrandedCanvas({
 
       const headlineEndY = headlineY + lines.length * lineH;
 
-      // ── LAYER 8: Accent bar + Tagline ──────────────────────────────
+      // LAYER 7: Accent bar + Tagline
       const barGap = fontSize * 0.45;
       const barY   = headlineEndY + barGap;
       const barW   = width * 0.07;
@@ -229,7 +451,7 @@ export default function BrandedCanvas({
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur  = 0;
 
-      // ── LAYER 9: Footer (no background — merged with image) ─────────
+      // LAYER 8: Footer disclaimers
       const ftSize  = width * 0.018;
       const ftLineH = ftSize * 1.55;
 
@@ -237,7 +459,6 @@ export default function BrandedCanvas({
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
 
-      // Helper: word-wrap a disclaimer string into canvas lines
       const wrapDisclaimer = (text: string): string[] => {
         const lines: string[] = [];
         let cur = '';
@@ -262,20 +483,19 @@ export default function BrandedCanvas({
       const ftStartY = footerY + (footerH - ftTotalH) / 2 + ftLineH / 2;
 
       allFtLines.forEach((line, i) => {
-        // Line 2 block rendered slightly dimmer
         const isLine2 = i >= line1Lines.length;
         ctx.fillStyle = isLine2 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.80)';
         ctx.fillText(line, width / 2, ftStartY + i * ftLineH);
       });
 
-      // ── Export ──────────────────────────────────────────────────────
+      // Export
       if (onExport) {
         onExport(canvas.toDataURL('image/jpeg', 0.92));
       }
     };
 
     render();
-  }, [backgroundImage, storyImage, headline, accentColor, logoUrl, tagline, disclaimer, language, width, height, onExport]);
+  }, [backgroundImage, storyImage, headline, accentColor, logoUrl, tagline, disclaimer, language, width, height, brandId, onExport]);
 
   return (
     <canvas

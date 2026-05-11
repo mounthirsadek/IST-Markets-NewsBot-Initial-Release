@@ -210,10 +210,21 @@ async function initSchema() {
       "ALTER TABLE stories ADD COLUMN en_caption_final MEDIUMTEXT",
       "ALTER TABLE stories ADD COLUMN ar_caption_final MEDIUMTEXT",
       "ALTER TABLE stories MODIFY COLUMN status ENUM('draft','review','approved','scheduled','published','rejected') DEFAULT 'draft'",
+      // Multi-brand support
+      "ALTER TABLE stories ADD COLUMN brand_id VARCHAR(50) NOT NULL DEFAULT 'ist-markets'",
     ];
     for (const sql of migrations) {
-      try { await conn.query(sql); } catch (_) { /* column already exists */ }
+      try { await conn.query(sql); } catch (_) { /* column already exists or no change needed */ }
     }
+
+    // ── Settings migration: copy old 'brand' key → 'brand-ist-markets' ──────
+    try {
+      await conn.query(`
+        INSERT IGNORE INTO settings (id, key_name, value, updated_at)
+        SELECT UUID(), 'brand-ist-markets', value, updated_at FROM settings WHERE key_name = 'brand'
+      `);
+    } catch (_) { /* ignore */ }
+
     console.log('✅ MySQL schema ready');
   } finally {
     conn.release();
@@ -996,8 +1007,8 @@ async function startServer() {
       await pool.query(
         `INSERT INTO stories (id, news_id, headline_en, headline_ar, caption_en, caption_ar,
           hashtags_en, hashtags_ar, hook_en, hook_ar, hook_hashtags_en, hook_hashtags_ar,
-          image_url, visual_brief, theme, format, status, platform, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          image_url, visual_brief, theme, format, status, platform, brand_id, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE
           headline_en=VALUES(headline_en), headline_ar=VALUES(headline_ar),
           caption_en=VALUES(caption_en), caption_ar=VALUES(caption_ar),
@@ -1006,7 +1017,7 @@ async function startServer() {
           hook_hashtags_en=VALUES(hook_hashtags_en), hook_hashtags_ar=VALUES(hook_hashtags_ar),
           image_url=VALUES(image_url), visual_brief=VALUES(visual_brief),
           theme=VALUES(theme), format=VALUES(format), status=VALUES(status),
-          platform=VALUES(platform), updated_at=NOW()`,
+          platform=VALUES(platform), brand_id=VALUES(brand_id), updated_at=NOW()`,
         [id, data.news_id || null, data.headline_en || null, data.headline_ar || null,
          data.caption_en || null, data.caption_ar || null,
          data.hashtags_en ? JSON.stringify(data.hashtags_en) : null,
@@ -1017,6 +1028,7 @@ async function startServer() {
          data.image_url || null, data.visual_brief || null,
          data.theme || null, data.format || 'Post',
          data.status || 'draft', data.platform || null,
+         data.brand_id || 'ist-markets',
          data.created_by || req.user.id]
       );
       res.json({ success: true, id });
@@ -1198,6 +1210,52 @@ async function startServer() {
     } catch (e: any) {
       const detail = e.response?.data || e.message;
       res.status(500).json({ error: typeof detail === 'object' ? JSON.stringify(detail) : detail });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  TELEGRAM BOT API
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  app.post('/api/telegram/send', checkAuth, async (req: any, res: any) => {
+    try {
+      const { imageUrl, caption, brandId } = req.body;
+      if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+
+      // Resolve bot token and chat ID per brand
+      const botToken = brandId === 'marsad-alsouq'
+        ? process.env.MARSAD_TELEGRAM_BOT_TOKEN
+        : process.env.IST_TELEGRAM_BOT_TOKEN;
+      const chatId = brandId === 'marsad-alsouq'
+        ? process.env.MARSAD_TELEGRAM_CHAT_ID
+        : process.env.IST_TELEGRAM_CHAT_ID;
+
+      if (!botToken || !chatId)
+        return res.status(400).json({ error: 'Telegram not configured for this brand. Set MARSAD_TELEGRAM_BOT_TOKEN and MARSAD_TELEGRAM_CHAT_ID in .env' });
+
+      // Resolve public image URL — data URIs cannot be sent to Telegram via URL
+      if (imageUrl.startsWith('data:'))
+        return res.status(400).json({ error: 'Image must be a public URL (not a data URI). Upload the image first via /api/upload-brand-asset then use the returned URL.' });
+
+      const publicUrl = imageUrl.startsWith('http')
+        ? imageUrl
+        : `${process.env.APP_URL || 'https://publisher.istmarkets.com'}${imageUrl}`;
+
+      const response = await axios.post(
+        `https://api.telegram.org/bot${botToken}/sendPhoto`,
+        {
+          chat_id: chatId,
+          photo: publicUrl,
+          caption: (caption || '').substring(0, 1024),
+        }
+      );
+
+      await logAction(req.user.id, 'PUBLISH_TELEGRAM', 'story', '', `Brand: ${brandId || 'unknown'}`);
+      res.json({ success: true, messageId: response.data?.result?.message_id });
+    } catch (e: any) {
+      const msg = e.response?.data?.description || e.message;
+      console.error('[Telegram] Error:', msg);
+      res.status(500).json({ error: msg });
     }
   });
 

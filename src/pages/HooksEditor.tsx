@@ -4,6 +4,7 @@ import { Zap, Image as ImageIcon, Save, Languages, ChevronLeft, Loader2, AlertCi
 import { generateHookContent, generateStoryImage, generateVisualBrief, StoryContent, ImageProvider } from '../services/geminiService';
 import { fetchWithAuth } from '../lib/api';
 import { useAuthStore } from '../store';
+import { useBrandStore } from '../context/BrandContext';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
 import BrandedCanvas from '../components/BrandedCanvas';
 
@@ -100,6 +101,7 @@ export default function HooksEditor() {
   const { articleId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { activeBrand } = useBrandStore();
 
   // ── Article selector state ──────────────────────────────────────────────────
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -148,11 +150,18 @@ export default function HooksEditor() {
 
   // ── Load brand settings ─────────────────────────────────────────────────────
   useEffect(() => {
-    fetchWithAuth('/api/settings/brand')
+    const brandDefaults: BrandSettings = {
+      ...DEFAULT_BRAND_SETTINGS,
+      defaultAccentColor: activeBrand.accentColor,
+      fixedTagline: activeBrand.defaults.fixedTagline,
+      footerDisclaimer: activeBrand.defaults.footerDisclaimer,
+      backgroundStyle: activeBrand.defaults.backgroundStyle,
+    };
+    fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`)
       .then(r => r.json())
-      .then(data => setBrandSettings(data ? { ...DEFAULT_BRAND_SETTINGS, ...data } : DEFAULT_BRAND_SETTINGS))
-      .catch(() => setBrandSettings(DEFAULT_BRAND_SETTINGS));
-  }, []);
+      .then(data => setBrandSettings(data ? { ...brandDefaults, ...data } : brandDefaults))
+      .catch(() => setBrandSettings(brandDefaults));
+  }, [activeBrand.id]);
 
   // ── Directly fetch the article from URL param ────────────────────────────────
   useEffect(() => {
@@ -205,8 +214,9 @@ export default function HooksEditor() {
     setImageError(null);
     try {
       const currentFormat = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+      const genAspectRatio = activeBrand.id === 'marsad-alsouq' ? '3:4' : currentFormat.aspectRatio;
       const brief = await generateVisualBrief(enHeadline, enCaption);
-      const url   = await generateStoryImage(brief, currentFormat.aspectRatio, imageProvider);
+      const url   = await generateStoryImage(brief, genAspectRatio, imageProvider);
       setImageUrl(url);
       setImageGenFormat(selectedFormat);
       const colors = await extractDominantColors(url);
@@ -225,7 +235,7 @@ export default function HooksEditor() {
     setSavingColor(true);
     try {
       const currentSettings = brandSettings || DEFAULT_BRAND_SETTINGS;
-      await fetchWithAuth('/api/settings/brand', {
+      await fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`, {
         method: 'PUT',
         body: JSON.stringify({ ...currentSettings, defaultAccentColor: color }),
       });
@@ -278,6 +288,7 @@ export default function HooksEditor() {
           image_url: imageUrl,
           format: selectedFormat,
           status: 'draft',
+          brand_id: activeBrand.id,
           created_by: user?.id,
         }),
       });
@@ -364,9 +375,13 @@ export default function HooksEditor() {
     }
   };
 
-  const dims = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+  const formatDims = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+  const dims = activeBrand.id === 'marsad-alsouq'
+    ? { width: activeBrand.canvasWidth, height: activeBrand.canvasHeight, aspectRatio: '3:4', label: 'Portrait (3:4)', platform: 'Instagram' }
+    : formatDims;
   const formatMismatch = imageUrl && imageGenFormat && imageGenFormat !== selectedFormat
-    && FORMAT_MAP[imageGenFormat]?.aspectRatio !== dims.aspectRatio;
+    && FORMAT_MAP[imageGenFormat]?.aspectRatio !== formatDims.aspectRatio
+    && activeBrand.id !== 'marsad-alsouq';
 
   const filteredArticles = articles.filter(a => {
     if (!searchTerm) return true;
@@ -684,6 +699,7 @@ export default function HooksEditor() {
                     language="en"
                     width={dims.width}
                     height={dims.height}
+                    brandId={activeBrand.id}
                     onExport={setEnBrandedUrl}
                   />
                 )}
@@ -730,6 +746,7 @@ export default function HooksEditor() {
                     language="ar"
                     width={dims.width}
                     height={dims.height}
+                    brandId={activeBrand.id}
                     onExport={setArBrandedUrl}
                   />
                 )}

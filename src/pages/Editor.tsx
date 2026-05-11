@@ -5,6 +5,7 @@ import { Sparkles, Image as ImageIcon, Send, Save, Languages, ChevronLeft, Loade
 import { rewriteArticle, generateStoryImage, generateVisualBrief, checkSafety, StoryContent, ImageProvider } from '../services/geminiService';
 import { fetchWithAuth } from '../lib/api';
 import { useAuthStore } from '../store';
+import { useBrandStore } from '../context/BrandContext';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
 import BrandedCanvas from '../components/BrandedCanvas';
 
@@ -89,6 +90,7 @@ export default function Editor() {
   const { articleId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { activeBrand } = useBrandStore();
   
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -135,15 +137,22 @@ export default function Editor() {
     if (articleId) {
       fetchArticle();
     }
-  }, [articleId]);
+  }, [articleId, activeBrand.id]);
 
   const fetchBrandSettings = async () => {
+    const brandDefaults: BrandSettings = {
+      ...DEFAULT_BRAND_SETTINGS,
+      defaultAccentColor: activeBrand.accentColor,
+      fixedTagline: activeBrand.defaults.fixedTagline,
+      footerDisclaimer: activeBrand.defaults.footerDisclaimer,
+      backgroundStyle: activeBrand.defaults.backgroundStyle,
+    };
     try {
-      const res = await fetchWithAuth('/api/settings/brand');
+      const res = await fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`);
       const data = await res.json();
-      setBrandSettings(data ? { ...DEFAULT_BRAND_SETTINGS, ...data } : DEFAULT_BRAND_SETTINGS);
+      setBrandSettings(data ? { ...brandDefaults, ...data } : brandDefaults);
     } catch {
-      setBrandSettings(DEFAULT_BRAND_SETTINGS);
+      setBrandSettings(brandDefaults);
     }
   };
 
@@ -209,8 +218,10 @@ export default function Editor() {
     setImageError(null);
     try {
       const currentFormat = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+      // For Marsad Al Souq always use 3:4 to match the brand canvas
+      const genAspectRatio = activeBrand.id === 'marsad-alsouq' ? '3:4' : currentFormat.aspectRatio;
       const brief = await generateVisualBrief(enHeadline, enCaption);
-      const url   = await generateStoryImage(brief, currentFormat.aspectRatio, imageProvider);
+      const url   = await generateStoryImage(brief, genAspectRatio, imageProvider);
       setImageUrl(url);
       setImageGenFormat(selectedFormat);
       // استخراج الألوان السائدة من الصورة المولَّدة
@@ -230,7 +241,7 @@ export default function Editor() {
     try {
       // Merge the new accent color into existing brand settings
       const merged = { ...(brandSettings || {}), defaultAccentColor: color };
-      await fetchWithAuth('/api/settings/brand', {
+      await fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`, {
         method: 'PUT',
         body: JSON.stringify(merged),
       });
@@ -371,6 +382,7 @@ export default function Editor() {
           image_url: imageUrl,
           format: selectedFormat,
           status,
+          brand_id: activeBrand.id,
           created_by: user?.id,
         }),
       });
@@ -388,9 +400,14 @@ export default function Editor() {
     }
   };
 
-  const dims = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+  const formatDims = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+  // Marsad Al Souq always renders at its fixed brand canvas size (1080×1620)
+  const dims = activeBrand.id === 'marsad-alsouq'
+    ? { width: activeBrand.canvasWidth, height: activeBrand.canvasHeight, aspectRatio: '3:4', label: 'Portrait (3:4)', platform: 'Instagram' }
+    : formatDims;
   const formatMismatch = imageUrl && imageGenFormat && imageGenFormat !== selectedFormat
-    && FORMAT_MAP[imageGenFormat]?.aspectRatio !== dims.aspectRatio;
+    && FORMAT_MAP[imageGenFormat]?.aspectRatio !== formatDims.aspectRatio
+    && activeBrand.id !== 'marsad-alsouq';
 
   if (loading) {
     return (
@@ -655,6 +672,7 @@ export default function Editor() {
                     language="en"
                     width={dims.width}
                     height={dims.height}
+                    brandId={activeBrand.id}
                     onExport={setEnBrandedUrl}
                   />
                 )}
@@ -701,6 +719,7 @@ export default function Editor() {
                     language="ar"
                     width={dims.width}
                     height={dims.height}
+                    brandId={activeBrand.id}
                     onExport={setArBrandedUrl}
                   />
                 )}
