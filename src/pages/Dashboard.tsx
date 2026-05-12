@@ -128,7 +128,7 @@ export default function Dashboard() {
             <TrendingUp size={20} className="text-[#f27d26]" />
             Content by Theme
           </h3>
-          <div className="h-64">
+          <div className="h-64 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={themeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
@@ -150,7 +150,7 @@ export default function Dashboard() {
             <TrendingUp size={20} className="text-blue-400" />
             Format Distribution
           </h3>
-          <div className="h-64 flex items-center">
+          <div className="h-64 min-w-0 flex items-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
