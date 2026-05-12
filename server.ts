@@ -1214,6 +1214,78 @@ async function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  //  MARSAD AL SOUQ — DATA ENDPOINTS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Economic Calendar — proxies FMP API for a given date
+  app.get('/api/marsad/economic-calendar', checkAuth, async (req: any, res: any) => {
+    try {
+      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const apiKey = process.env.FMP_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: 'FMP_API_KEY not configured' });
+
+      const url = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${date}&to=${date}&apikey=${apiKey}`;
+      const response = await axios.get(url);
+      const raw = Array.isArray(response.data) ? response.data : [];
+
+      const events = raw.map((e: any) => {
+        // FMP time field: "2024-01-15 14:30:00" or just "14:30"
+        const rawTime: string = e.time || e.date || '';
+        const time = rawTime.includes('T')
+          ? rawTime.split('T')[1]?.slice(0, 5) || ''
+          : rawTime.includes(' ')
+            ? rawTime.split(' ')[1]?.slice(0, 5) || ''
+            : rawTime.slice(0, 5);
+
+        const actual   = e.actual   != null && e.actual   !== '' ? String(e.actual)   : undefined;
+        const forecast = e.estimate != null && e.estimate !== '' ? String(e.estimate) : undefined;
+        const previous = e.previous != null && e.previous !== '' ? String(e.previous) : undefined;
+
+        // Derive beat/miss/neutral
+        let result: 'beat' | 'miss' | 'neutral' = 'neutral';
+        if (actual !== undefined && forecast !== undefined) {
+          const a = parseFloat(actual), f = parseFloat(forecast);
+          if (!isNaN(a) && !isNaN(f)) result = a > f ? 'beat' : a < f ? 'miss' : 'neutral';
+        }
+
+        return {
+          time,
+          country: e.country || '',
+          event:   e.event   || '',
+          actual,
+          forecast,
+          previous,
+          impact: ((e.impact || 'Low') as string).toLowerCase() as 'high' | 'medium' | 'low',
+          result,
+        };
+      });
+
+      // Sort chronologically
+      events.sort((a: any, b: any) => a.time.localeCompare(b.time));
+      res.json(events);
+    } catch (e: any) {
+      console.error('[MarsadCalendar] Error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // QR Code generator — returns gold-on-navy QR as base64 data URL
+  app.get('/api/marsad/qrcode', checkAuth, async (req: any, res: any) => {
+    try {
+      const url = req.query.url as string;
+      if (!url) return res.status(400).json({ error: 'url param required' });
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 240,
+        margin: 1,
+        color: { dark: '#C9A84C', light: '#0D1B2A' },
+      });
+      res.json({ dataUrl });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   //  TELEGRAM BOT API
   // ═══════════════════════════════════════════════════════════════════════════
 

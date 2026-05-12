@@ -15,6 +15,7 @@ import TwoFactorSetup from './pages/TwoFactorSetup';
 import Login from './pages/Login';
 import HooksEditor from './pages/HooksEditor';
 import TrendingPage from './pages/TrendingPage';
+import MarsadCards from './pages/MarsadCards';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
   const { user, role } = useAuthStore();
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="admin" element={<ProtectedRoute allowedRoles={['admin', 'super-admin']}><Admin /></ProtectedRoute>} />
           <Route path="hooks/:articleId?" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><HooksEditor /></ProtectedRoute>} />
           <Route path="trending" element={<ProtectedRoute><TrendingPage /></ProtectedRoute>} />
+          <Route path="cards" element={<ProtectedRoute allowedRoles={['editor', 'senior-editor', 'admin', 'super-admin']}><MarsadCards /></ProtectedRoute>} />
           <Route path="security" element={<ProtectedRoute><TwoFactorSetup /></ProtectedRoute>} />
         </Route>
       </Routes>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap, TrendingUp, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Newspaper, PenTool, Archive, Settings, LogOut, Palette, History, Shield, Lock, Menu, X, Zap, TrendingUp, ChevronDown, LayoutTemplate } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuthStore } from '../store';
@@ -12,17 +12,19 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: Newspaper, label: 'News Feed', path: '/news', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
-  { icon: PenTool, label: 'Editor', path: '/editor', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
-  { icon: Zap, label: 'Hooks', path: '/hooks', roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
-  { icon: TrendingUp, label: 'Trending', path: '/trending' },
-  { icon: Archive, label: 'Archive', path: '/archive' },
-  { icon: Palette, label: 'Brand Settings', path: '/brand', roles: ['admin', 'super-admin'] },
-  { icon: Settings, label: 'Company Settings', path: '/settings', roles: ['admin', 'super-admin'] },
-  { icon: History, label: 'Audit Logs', path: '/logs', roles: ['admin', 'super-admin'] },
-  { icon: Shield, label: 'Admin', path: '/admin', roles: ['admin', 'super-admin'] },
-  { icon: Lock, label: 'Security', path: '/security' },
+  { icon: LayoutDashboard, label: 'Dashboard',       path: '/' },
+  { icon: Newspaper,       label: 'News Feed',        path: '/news',    roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
+  { icon: PenTool,         label: 'Editor',           path: '/editor',  roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
+  { icon: Zap,             label: 'Hooks',            path: '/hooks',   roles: ['editor', 'senior-editor', 'admin', 'super-admin'] },
+  // Marsad Al Souq card generator — only visible when Marsad brand is active
+  { icon: LayoutTemplate,  label: 'البطاقات',         path: '/cards',   roles: ['editor', 'senior-editor', 'admin', 'super-admin'], brandId: 'marsad-alsouq' },
+  { icon: TrendingUp,      label: 'Trending',         path: '/trending' },
+  { icon: Archive,         label: 'Archive',          path: '/archive' },
+  { icon: Palette,         label: 'Brand Settings',   path: '/brand',   roles: ['admin', 'super-admin'] },
+  { icon: Settings,        label: 'Company Settings', path: '/settings',roles: ['admin', 'super-admin'] },
+  { icon: History,         label: 'Audit Logs',       path: '/logs',    roles: ['admin', 'super-admin'] },
+  { icon: Shield,          label: 'Admin',            path: '/admin',   roles: ['admin', 'super-admin'] },
+  { icon: Lock,            label: 'Security',         path: '/security' },
 ];
 
 export default function Layout() {
@@ -41,7 +43,8 @@ export default function Layout() {
   };
 
   const filteredNavItems = navItems.filter(item =>
-    !item.roles || (role && item.roles.includes(role))
+    (!item.roles   || (role && item.roles.includes(role))) &&
+    (!(item as any).brandId || (item as any).brandId === activeBrand.id)
   );
 
   return (
