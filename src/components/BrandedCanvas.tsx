@@ -275,14 +275,18 @@ async function renderMarsadSignal(
   const { cardX, cardY, cardW, cardH } = drawMarsadBg(ctx, width, height);
   const cx = cardX + cardW / 2;
 
+  // Scale factor: all y-offsets were designed for 1600px card height (1620 canvas).
+  // Scaling proportionally makes every layout fit any canvas height.
+  const s = cardH / 1600;
+
   await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
 
-  // ── Asset type + Timeframe pills (y ≈ 175) ──────────────────────────────
-  const pillY  = cardY + 185;
-  const pillH  = 46;
+  // ── Asset type + Timeframe pills ────────────────────────────────────────
+  const pillY  = cardY + Math.round(185 * s);
+  const pillH  = Math.round(46 * s);
   const pillGap = 14;
 
-  ctx.font = `600 22px Cairo, Arial, sans-serif`;
+  ctx.font = `600 ${Math.round(22 * s)}px Cairo, Arial, sans-serif`;
   const assetW = ctx.measureText(data.assetType).width + 44;
   const tfW    = ctx.measureText(data.timeframe).width + 44;
   const totalPW = assetW + pillGap + tfW;
@@ -304,38 +308,40 @@ async function renderMarsadSignal(
   ctx.fillStyle = '#90CAF9'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(data.timeframe, px + tfW / 2, pillY);
 
-  // ── Pair name (y ≈ 255) ──────────────────────────────────────────────────
-  ctx.font         = `900 88px Cairo, Arial, sans-serif`;
+  // ── Pair name ────────────────────────────────────────────────────────────
+  const pairFontSz = Math.round(88 * s);
+  ctx.font         = `900 ${pairFontSz}px Cairo, Arial, sans-serif`;
   ctx.direction    = 'ltr';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle    = '#FFFFFF';
   ctx.shadowColor  = 'rgba(0,0,0,0.6)';
   ctx.shadowBlur   = 20;
-  ctx.fillText(data.pair, cx, cardY + 240);
+  ctx.fillText(data.pair, cx, cardY + Math.round(240 * s));
   ctx.shadowColor  = 'transparent'; ctx.shadowBlur = 0;
 
-  // ── Direction pill (y ≈ 380) ─────────────────────────────────────────────
+  // ── Direction pill ───────────────────────────────────────────────────────
   const isBuy    = data.direction === 'BUY';
   const dirColor = isBuy ? '#10B981' : '#DC2626';
   const dirBg    = isBuy ? 'rgba(16,185,129,0.18)' : 'rgba(220,38,38,0.18)';
   const dirLabel = isBuy ? '▲   BUY  /  شراء' : '▼   SELL  /  بيع';
-  ctx.font = `700 30px Cairo, Arial, sans-serif`;
+  const dirFontSz = Math.round(30 * s);
+  ctx.font = `700 ${dirFontSz}px Cairo, Arial, sans-serif`;
   const dirW = ctx.measureText(dirLabel).width + 70;
-  const dirH = 62;
+  const dirH = Math.round(62 * s);
   const dirX = cx - dirW / 2;
-  const dirBaseY = cardY + 380;
+  const dirBaseY = cardY + Math.round(380 * s);
   roundedRectPath(ctx, dirX, dirBaseY, dirW, dirH, 16);
   ctx.fillStyle = dirBg; ctx.fill();
   ctx.strokeStyle = dirColor; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.fillStyle = dirColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(dirLabel, cx, dirBaseY + dirH / 2);
 
-  // ── Chart zone (y = 465 → 985) ───────────────────────────────────────────
+  // ── Chart zone ───────────────────────────────────────────────────────────
   const chartX = cardX + PAD;
-  const chartY = cardY + 465;
+  const chartY = cardY + Math.round(465 * s);
   const chartW = cardW - PAD * 2;
-  const chartH = 520;
+  const chartH = Math.round(520 * s);
 
   ctx.save();
   roundedRectPath(ctx, chartX, chartY, chartW, chartH, 10);
@@ -360,7 +366,7 @@ async function renderMarsadSignal(
       const gx = chartX + (chartW / 8) * i;
       ctx.beginPath(); ctx.moveTo(gx, chartY); ctx.lineTo(gx, chartY + chartH); ctx.stroke();
     }
-    ctx.font = `400 28px Cairo, Arial, sans-serif`;
+    ctx.font = `400 ${Math.round(28 * s)}px Cairo, Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fillText('لقطة الرسم البياني', chartX + chartW / 2, chartY + chartH / 2);
@@ -371,10 +377,10 @@ async function renderMarsadSignal(
   roundedRectPath(ctx, chartX, chartY, chartW, chartH, 10);
   ctx.strokeStyle = GOLD + '30'; ctx.lineWidth = 1; ctx.stroke();
 
-  // ── 3 Level cards (y = 1005 → 1155) ─────────────────────────────────────
+  // ── 3 Level cards ────────────────────────────────────────────────────────
   // RTL visual order: Target (left) | Stop (middle) | Entry (right)
-  const lcY   = cardY + 1005;
-  const lcH   = 150;
+  const lcY   = cardY + Math.round(1005 * s);
+  const lcH   = Math.round(150 * s);
   const avail = cardW - PAD * 2;
   const lcGap = 18;
   const lcW   = Math.floor((avail - lcGap * 2) / 3);
@@ -393,38 +399,39 @@ async function renderMarsadSignal(
     ctx.strokeStyle = lv.color; ctx.lineWidth = 1.2; ctx.stroke();
 
     // Label
-    ctx.font = `600 22px Cairo, Arial, sans-serif`;
+    ctx.font = `600 ${Math.round(22 * s)}px Cairo, Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillStyle = lv.color;
     ctx.direction = 'rtl';
-    ctx.fillText(lv.label, lv.x + lcW / 2, lcY + 14);
+    ctx.fillText(lv.label, lv.x + lcW / 2, lcY + Math.round(14 * s));
 
     // Value
-    ctx.font = `700 30px Cairo, Arial, sans-serif`;
+    ctx.font = `700 ${Math.round(30 * s)}px Cairo, Arial, sans-serif`;
     ctx.direction = 'ltr';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#FFFFFF';
     ctx.fillText(lv.value.toFixed(decimals(lv.value)), lv.x + lcW / 2, lcY + lcH * 0.65);
   }
 
-  // ── Setup notes (optional, y ≈ 1175) ────────────────────────────────────
-  let contentEndY = lcY + lcH + 20;
+  // ── Setup notes (optional) ───────────────────────────────────────────────
+  const lineH = Math.round(36 * s);
+  let contentEndY = lcY + lcH + Math.round(20 * s);
   if (data.setupNotes) {
-    ctx.font = `500 26px Cairo, Arial, sans-serif`;
+    ctx.font = `500 ${Math.round(26 * s)}px Cairo, Arial, sans-serif`;
     ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
     const notes = wrapText(ctx, data.setupNotes, cardW - PAD * 2);
-    notes.slice(0, 3).forEach((line, i) => {
-      ctx.fillText(line, cardX + cardW - PAD, contentEndY + i * 36);
+    notes.slice(0, 2).forEach((line, i) => {
+      ctx.fillText(line, cardX + cardW - PAD, contentEndY + i * lineH);
     });
-    contentEndY += notes.slice(0, 3).length * 36 + 14;
+    contentEndY += notes.slice(0, 2).length * lineH + Math.round(14 * s);
   }
 
   // ── R:R ratio ─────────────────────────────────────────────────────────────
-  ctx.font = `700 28px Cairo, Arial, sans-serif`;
+  ctx.font = `700 ${Math.round(28 * s)}px Cairo, Arial, sans-serif`;
   ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
   ctx.fillStyle = GOLD;
-  ctx.fillText(`نسبة المخاطرة:  ${data.rrRatio}`, cardX + cardW - PAD, contentEndY + 10);
+  ctx.fillText(`نسبة المخاطرة:  ${data.rrRatio}`, cardX + cardW - PAD, contentEndY + Math.round(10 * s));
 
   await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl);
 }
@@ -443,28 +450,30 @@ async function renderMarsadCalendar(
 
   const { cardX, cardY, cardW, cardH } = drawMarsadBg(ctx, width, height);
   const cx = cardX + cardW / 2;
+  const s = cardH / 1600;  // proportional scale factor
 
   await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
 
-  // ── Title (y ≈ 165) ──────────────────────────────────────────────────────
-  ctx.font = `900 52px Cairo, Arial, sans-serif`;
+  // ── Title ────────────────────────────────────────────────────────────────
+  ctx.font = `900 ${Math.round(52 * s)}px Cairo, Arial, sans-serif`;
   ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
   ctx.fillStyle = GOLD;
-  ctx.fillText('الأجندة الاقتصادية', cardX + cardW - PAD, cardY + 165);
+  ctx.fillText('الأجندة الاقتصادية', cardX + cardW - PAD, cardY + Math.round(165 * s));
 
-  // ── Date pill (y ≈ 248) ──────────────────────────────────────────────────
+  // ── Date pill ────────────────────────────────────────────────────────────
   const dateDisplay = data.date
     ? new Date(data.date + 'T00:00:00').toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  drawCenteredPill(ctx, dateDisplay, cx, cardY + 270, '#0A1628', GOLD, GOLD, 22, 48, 24, 28);
+  drawCenteredPill(ctx, dateDisplay, cx, cardY + Math.round(270 * s), '#0A1628', GOLD, GOLD,
+    Math.round(22 * s), Math.round(48 * s), 24, 28);
 
   // ── Table ─────────────────────────────────────────────────────────────────
   const tableX  = cardX + PAD;
   const tableW  = cardW - PAD * 2;
-  const tHdrY   = cardY + 315;
-  const tHdrH   = 58;
-  const rowH    = 98;
+  const tHdrY   = cardY + Math.round(315 * s);
+  const tHdrH   = Math.round(58 * s);
+  const rowH    = Math.round(98 * s);
   const maxRows = 8;
 
   // Column widths (RTL layout — rightmost = time, leftmost = profit/actual)
@@ -496,7 +505,7 @@ async function renderMarsadCalendar(
   drawGoldRule(ctx, cardX, tHdrY, cardW, 0.20);
   drawGoldRule(ctx, cardX, tHdrY + tHdrH, cardW, 0.15);
 
-  ctx.font = `600 21px Cairo, Arial, sans-serif`;
+  ctx.font = `600 ${Math.round(21 * s)}px Cairo, Arial, sans-serif`;
   ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = GOLD;
   for (const ch of colHeaders) {
@@ -604,23 +613,25 @@ async function renderMarsadProofOfTrades(
 
   const { cardX, cardY, cardW, cardH } = drawMarsadBg(ctx, width, height);
   const cx = cardX + cardW / 2;
+  const s = cardH / 1600;  // proportional scale factor
 
   await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
 
-  // ── Title (y ≈ 165) ──────────────────────────────────────────────────────
-  ctx.font = `900 52px Cairo, Arial, sans-serif`;
+  // ── Title ────────────────────────────────────────────────────────────────
+  ctx.font = `900 ${Math.round(52 * s)}px Cairo, Arial, sans-serif`;
   ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
   ctx.fillStyle = GOLD;
-  ctx.fillText('إثبات الصفقات', cardX + cardW - PAD, cardY + 165);
+  ctx.fillText('إثبات الصفقات', cardX + cardW - PAD, cardY + Math.round(165 * s));
 
   // Subtitle
-  ctx.font = `400 24px Cairo, Arial, sans-serif`;
+  ctx.font = `400 ${Math.round(24 * s)}px Cairo, Arial, sans-serif`;
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
-  ctx.fillText('MetaTrader 5 · لقطة شاشة', cardX + cardW - PAD, cardY + 228);
+  ctx.fillText('MetaTrader 5 · لقطة شاشة', cardX + cardW - PAD, cardY + Math.round(228 * s));
 
   // Period pill
   if (data.period) {
-    drawCenteredPill(ctx, data.period, cx, cardY + 282, '#0A1628', GOLD, GOLD, 22, 44, 22, 24);
+    drawCenteredPill(ctx, data.period, cx, cardY + Math.round(282 * s),
+      '#0A1628', GOLD, GOLD, Math.round(22 * s), Math.round(44 * s), 22, 24);
   }
 
   // ── Dynamic layout: work backwards from footer so screenshot fills space ──
@@ -636,9 +647,9 @@ async function renderMarsadProofOfTrades(
   const sepY         = tHdrY - 16;
 
   const ssX  = cardX + PAD;
-  const ssY  = cardY + 310;
+  const ssY  = cardY + Math.round(310 * s);
   const ssW  = cardW - PAD * 2;
-  const ssH  = Math.max(220, sepY - 22 - ssY);
+  const ssH  = Math.max(Math.round(180 * s), sepY - 22 - ssY);
 
   const tableX = cardX + PAD;
   const tableW = cardW - PAD * 2;
@@ -791,6 +802,7 @@ async function renderMarsadWebinar(
 
   const { cardX, cardY, cardW, cardH } = drawMarsadBg(ctx, width, height);
   const cx = cardX + cardW / 2;
+  const s = cardH / 1600;  // proportional scale factor
 
   // Decorative corner glows
   const glowTR = ctx.createRadialGradient(cardX + cardW, cardY, 0, cardX + cardW, cardY, 380);
@@ -803,21 +815,25 @@ async function renderMarsadWebinar(
 
   await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
 
-  // ── Event badge (y ≈ 190) ────────────────────────────────────────────────
-  drawCenteredPill(ctx, '🎙️  ندوة مباشرة', cx, cardY + 200, '#0A1628', GOLD, GOLD, 24, 54, 27, 32);
+  // ── Event badge ──────────────────────────────────────────────────────────
+  drawCenteredPill(ctx, '🎙️  ندوة مباشرة', cx, cardY + Math.round(200 * s),
+    '#0A1628', GOLD, GOLD, Math.round(24 * s), Math.round(54 * s), 27, 32);
 
-  // ── Event title (y ≈ 275) ────────────────────────────────────────────────
-  ctx.font = `800 64px Cairo, Arial, sans-serif`;
+  // ── Event title ───────────────────────────────────────────────────────────
+  const titleFontSz = Math.round(64 * s);
+  const titleLineH  = Math.round(80 * s);
+  ctx.font = `800 ${titleFontSz}px Cairo, Arial, sans-serif`;
   ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillStyle = '#FFFFFF';
   ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 24;
   const titleLines = wrapText(ctx, data.title || 'عنوان الندوة', cardW - PAD * 3);
+  const titleStartY = cardY + Math.round(275 * s);
   titleLines.slice(0, 3).forEach((line, i) => {
-    ctx.fillText(line, cx, cardY + 275 + i * 80);
+    ctx.fillText(line, cx, titleStartY + i * titleLineH);
   });
   ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
-  let contentY = cardY + 275 + titleLines.slice(0, 3).length * 80 + 16;
+  let contentY = titleStartY + titleLines.slice(0, 3).length * titleLineH + 16;
 
   // Subtitle
   if (data.subtitle) {
@@ -836,21 +852,24 @@ async function renderMarsadWebinar(
   contentY += 24;
 
   // ── Date pill ─────────────────────────────────────────────────────────────
-  drawCenteredPill(ctx, '📅  ' + (data.dateAr || 'تاريخ الندوة'), cx, contentY + 30, '#0A1628', GOLD + '80', 'rgba(255,255,255,0.85)', 24, 56, 28, 28);
-  contentY += 70;
+  drawCenteredPill(ctx, '📅  ' + (data.dateAr || 'تاريخ الندوة'), cx, contentY + Math.round(30 * s),
+    '#0A1628', GOLD + '80', 'rgba(255,255,255,0.85)', Math.round(24 * s), Math.round(56 * s), 28, 28);
+  contentY += Math.round(70 * s);
 
   // ── Time pill ─────────────────────────────────────────────────────────────
-  drawCenteredPill(ctx, '🕐  ' + (data.timeAr || 'وقت الندوة'), cx, contentY + 30, '#0A1628', '#1E88E580', 'rgba(255,255,255,0.85)', 24, 56, 28, 28);
-  contentY += 70;
+  drawCenteredPill(ctx, '🕐  ' + (data.timeAr || 'وقت الندوة'), cx, contentY + Math.round(30 * s),
+    '#0A1628', '#1E88E580', 'rgba(255,255,255,0.85)', Math.round(24 * s), Math.round(56 * s), 28, 28);
+  contentY += Math.round(70 * s);
 
   // ── Platform badge ────────────────────────────────────────────────────────
   const platColor = data.platform === 'تيليغرام' ? '#2AABEE' : '#6B7280';
-  drawCenteredPill(ctx, data.platform || 'تيليغرام', cx, contentY + 28, platColor + '20', platColor, platColor, 22, 46, 23, 24);
-  contentY += 70;
+  drawCenteredPill(ctx, data.platform || 'تيليغرام', cx, contentY + Math.round(28 * s),
+    platColor + '20', platColor, platColor, Math.round(22 * s), Math.round(46 * s), 23, 24);
+  contentY += Math.round(70 * s);
 
-  // ── QR Code (y ≈ contentY) ────────────────────────────────────────────────
+  // ── QR Code ───────────────────────────────────────────────────────────────
   if (data.qrDataUrl) {
-    const qrSize = 220;
+    const qrSize = Math.round(220 * s);
     const qrX = cx - qrSize / 2;
     const qrY = contentY + 10;
 
@@ -880,7 +899,7 @@ async function renderMarsadWebinar(
     contentY = qrY + qrSize + 52;
   } else if (data.bookingUrl) {
     // Placeholder when QR not yet loaded
-    const qrSize = 180;
+    const qrSize = Math.round(180 * s);
     roundedRectPath(ctx, cx - qrSize / 2, contentY + 10, qrSize, qrSize, 10);
     ctx.fillStyle = '#0A1628'; ctx.fill();
     ctx.setLineDash([8, 6]);

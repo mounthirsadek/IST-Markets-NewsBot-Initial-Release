@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight } from 'lucide-react';
+import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight, Sparkles } from 'lucide-react';
 import { useBrandStore } from '../context/BrandContext';
 import { fetchWithAuth } from '../lib/api';
 import BrandedCanvas from '../components/BrandedCanvas';
@@ -77,6 +77,8 @@ export default function MarsadCards() {
   const [calLoading, setCalLoading] = useState(false);
   // Webinar QR
   const [qrLoading, setQrLoading] = useState(false);
+  // AI chart analysis
+  const [analyzing, setAnalyzing] = useState(false);
   // New tag input
   const [newTag, setNewTag] = useState('');
 
@@ -120,6 +122,40 @@ export default function MarsadCards() {
       setCalLoading(false);
     }
   }, [calendar.date, showToast]);
+
+  // ── Analyze chart image with Gemini Vision ───────────────────────────────
+  const handleAnalyzeChart = useCallback(async (imageBase64: string) => {
+    setAnalyzing(true);
+    try {
+      const res = await fetchWithAuth('/api/marsad/analyze-chart', {
+        method: 'POST',
+        body: JSON.stringify({ imageBase64 }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json();
+
+      // Auto-fill all signal fields from AI response
+      setSignal(prev => ({
+        ...prev,
+        pair:        data.pair       || prev.pair,
+        direction:   (data.direction === 'BUY' || data.direction === 'SELL') ? data.direction : prev.direction,
+        assetType:   (['Forex','Crypto','Indices','Commodities'].includes(data.assetType)) ? data.assetType : prev.assetType,
+        timeframe:   (['M15','H1','H4','D1','W1'].includes(data.timeframe)) ? data.timeframe : prev.timeframe,
+        entry:       Number(data.entry)      || prev.entry,
+        stopLoss:    Number(data.stopLoss)   || prev.stopLoss,
+        takeProfit:  Number(data.takeProfit) || prev.takeProfit,
+        setupNotes:  data.setupNotes || prev.setupNotes,
+        chartImage:  imageBase64,
+      }));
+
+      const conf = data.confidence === 'high' ? 'عالية ✓' : data.confidence === 'medium' ? 'متوسطة' : 'منخفضة';
+      showToast('success', `تم تحليل الشارت — ثقة: ${conf}`);
+    } catch (e: any) {
+      showToast('error', 'فشل التحليل: ' + e.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [showToast]);
 
   // ── Fetch QR code when booking URL changes ───────────────────────────────
   useEffect(() => {
@@ -358,21 +394,57 @@ export default function MarsadCards() {
                 />
               </div>
 
-              {/* Chart image upload */}
+              {/* Chart image upload + AI analysis */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">لقطة الرسم البياني (اختياري)</label>
+                <label className="block text-xs text-white/40 mb-2">لقطة الرسم البياني</label>
+
+                {/* Upload button */}
                 <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-xl px-4 py-3 hover:border-[#C9A84C]/50 transition-colors">
                   <ChevronRight size={16} className="text-white/30" />
                   <span className="text-sm text-white/40">
-                    {signal.chartImage ? 'تم رفع الصورة ✓' : 'اضغط لرفع لقطة الشاشة'}
+                    {signal.chartImage ? 'تم رفع الصورة ✓ — اضغط لتغييرها' : 'اضغط لرفع لقطة الشاشة'}
                   </span>
                   <input type="file" accept="image/*" className="hidden"
                     onChange={async e => {
                       const f = e.target.files?.[0];
-                      if (f) setSignal(s => ({ ...s, chartImage: undefined }));
-                      if (f) { const b64 = await fileToBase64(f); setSignal(s => ({ ...s, chartImage: b64 })); }
+                      if (!f) return;
+                      const b64 = await fileToBase64(f);
+                      setSignal(s => ({ ...s, chartImage: b64 }));
                     }} />
                 </label>
+
+                {/* AI analysis button — shown once image is uploaded */}
+                {signal.chartImage && (
+                  <button
+                    onClick={() => signal.chartImage && handleAnalyzeChart(signal.chartImage)}
+                    disabled={analyzing}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
+                    style={{
+                      background: 'linear-gradient(135deg, #1a0f3d 0%, #2d1b69 100%)',
+                      border: '1px solid #7c3aed80',
+                      color: '#c4b5fd',
+                    }}
+                  >
+                    {analyzing ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-[#c4b5fd] border-t-transparent animate-spin" />
+                        جارٍ التحليل بالذكاء الاصطناعي…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={15} />
+                        تحليل الشارت بالذكاء الاصطناعي
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Preview of uploaded chart */}
+                {signal.chartImage && (
+                  <div className="mt-2 rounded-xl overflow-hidden border border-white/10" style={{ height: 80 }}>
+                    <img src={signal.chartImage} alt="chart" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -679,7 +751,7 @@ export default function MarsadCards() {
 
         {/* ── Preview panel ───────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-8 px-4 bg-[#060606]">
-          <div className="mb-4 text-xs text-white/25 font-mono tracking-wide">معاينة البطاقة • 1080 × 1620</div>
+          <div className="mb-4 text-xs text-white/25 font-mono tracking-wide">معاينة البطاقة • 1080 × 1350</div>
 
           {cardDataUrl ? (
             <img
@@ -691,7 +763,7 @@ export default function MarsadCards() {
           ) : (
             <div
               className="flex items-center justify-center rounded-2xl bg-[#0D1B2A] border border-white/10"
-              style={{ width: PREVIEW_W, height: Math.round(PREVIEW_W * (1620 / 1080)) }}
+              style={{ width: PREVIEW_W, height: Math.round(PREVIEW_W * (1350 / 1080)) }}
             >
               <div className="flex flex-col items-center gap-3 text-white/30">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#C9A84C]" />
@@ -711,7 +783,7 @@ export default function MarsadCards() {
         aria-hidden="true"
         style={{
           position: 'fixed', left: '-9999px', top: '-9999px',
-          width: 1080, height: 1620,
+          width: 1080, height: 1350,
           opacity: 0, pointerEvents: 'none', zIndex: -1,
         }}
       >
@@ -725,7 +797,7 @@ export default function MarsadCards() {
           disclaimer=""
           language="ar"
           width={1080}
-          height={1620}
+          height={1350}
           brandId="marsad-alsouq"
           cardType={activeTab}
           cardData={

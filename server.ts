@@ -1217,6 +1217,70 @@ async function startServer() {
   //  MARSAD AL SOUQ — DATA ENDPOINTS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ── Chart analysis — Gemini Vision extracts trade signal from uploaded chart ──
+  app.post('/api/marsad/analyze-chart', checkAuth, async (req: any, res: any) => {
+    try {
+      const { imageBase64 } = req.body;
+      if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+      // Strip data-URI prefix → raw base64 + mimeType
+      const dataMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!dataMatch) return res.status(400).json({ error: 'Invalid image format — expected data:mime;base64,...' });
+      const mimeType  = dataMatch[1];
+      const base64Data = dataMatch[2];
+
+      const chartSchema = {
+        type: Type.OBJECT,
+        properties: {
+          pair:       { type: Type.STRING, description: 'Currency pair or asset symbol e.g. XAUUSD' },
+          direction:  { type: Type.STRING, description: 'BUY or SELL' },
+          assetType:  { type: Type.STRING, description: 'Forex | Crypto | Indices | Commodities' },
+          timeframe:  { type: Type.STRING, description: 'M15 | H1 | H4 | D1 | W1' },
+          entry:      { type: Type.NUMBER, description: 'Entry price level (0 if not determinable)' },
+          stopLoss:   { type: Type.NUMBER, description: 'Stop loss level (0 if not determinable)' },
+          takeProfit: { type: Type.NUMBER, description: 'Take profit level (0 if not determinable)' },
+          setupNotes: { type: Type.STRING, description: 'Brief trade setup description in Arabic' },
+          confidence: { type: Type.STRING, description: 'high | medium | low' },
+        },
+        required: ['pair', 'direction', 'assetType', 'timeframe', 'entry', 'stopLoss', 'takeProfit', 'setupNotes', 'confidence'],
+      };
+
+      const prompt = `أنت محلل تقني خبير. قم بتحليل هذا الرسم البياني للتداول واستخرج:
+
+1. رمز الزوج أو الأصل (مثل XAUUSD, EURUSD, BTCUSD, US500, OIL)
+2. اتجاه التداول: BUY أو SELL بناءً على التحليل
+3. نوع الأصل: Forex أو Crypto أو Indices أو Commodities
+4. الإطار الزمني المرئي في الرسم البياني (M15, H1, H4, D1, W1)
+5. سعر الدخول (من مستوى دعم/مقاومة أو نقطة اختراق)
+6. مستوى وقف الخسارة (Stop Loss) — تحت/فوق أقرب مستوى رئيسي
+7. مستوى جني الأرباح (Take Profit) — الهدف التالي
+8. ملاحظات الإعداد باللغة العربية (النمط المرئي، السبب)
+9. مستوى الثقة: high أو medium أو low
+
+إذا لم تتمكن من تحديد قيمة معينة، استخدم 0 للأرقام واختر أقرب قيمة منطقية للنصوص.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: prompt },
+          ],
+        }],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: chartSchema,
+        },
+      });
+
+      const result = JSON.parse(response.text || '{}');
+      await logAction(req.user.id, 'ANALYZE_CHART', 'marsad-card', null, `pair=${result.pair} direction=${result.direction}`);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Economic Calendar — proxies FMP API for a given date
   app.get('/api/marsad/economic-calendar', checkAuth, async (req: any, res: any) => {
     try {
