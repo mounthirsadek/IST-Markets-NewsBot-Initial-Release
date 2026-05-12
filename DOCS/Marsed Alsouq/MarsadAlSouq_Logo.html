@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مرصد السوق — Brand Logo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #080F1A;
+    min-height: 100vh;
+    font-family: 'Montserrat', sans-serif;
+    color: #E2E8F0;
+    padding: 56px 32px 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 64px;
+  }
+  .page-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-eyebrow { font-size: 10px; letter-spacing: 5px; text-transform: uppercase; color: #9BA3AF; direction: ltr; }
+  .page-title-ar { font-family: 'Cairo', sans-serif; font-size: 36px; font-weight: 900; color: #C9A84C; direction: rtl; }
+  .page-rule { width: 80px; height: 2px; background: linear-gradient(90deg, transparent, #C9A84C, transparent); margin: 4px 0; }
+  .page-title-en { font-size: 13px; letter-spacing: 4px; text-transform: uppercase; color: #9BA3AF; direction: ltr; }
+  .section { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; max-width: 1100px; }
+  .section-label { font-size: 9px; letter-spacing: 5px; text-transform: uppercase; color: #C9A84C; border-bottom: 1px solid #1A2744; padding-bottom: 10px; width: 100%; text-align: center; direction: ltr; }
+  .logo-row { display: flex; gap: 32px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  .logo-card { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .logo-card-label { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: #4B5563; direction: ltr; }
+  .color-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  .chip { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .chip-swatch { width: 56px; height: 56px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+  .chip-hex { font-size: 10px; font-family: 'Courier New', monospace; color: #9BA3AF; letter-spacing: 0.5px; }
+  .chip-name { font-size: 9px; color: #4B5563; letter-spacing: 1px; text-align: center; text-transform: uppercase; }
+  footer { font-size: 10px; color: #1E2D45; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <div class="page-eyebrow">Brand Identity — Logo Presentation</div>
+  <div class="page-title-ar">مرصد السوق</div>
+  <div class="page-rule"></div>
+  <div class="page-title-en">Marsad Al Souq &nbsp;·&nbsp; Market Observatory</div>
+</div>
+
+<!-- SECTION 1: TELEGRAM PROFILE ICON -->
+<div class="section">
+  <div class="section-label">01 — Telegram Profile Icon (Dark Mode)</div>
+  <div class="logo-row">
+
+    <!-- FULL SQUARE -->
+    <div class="logo-card">
+      <svg width="240" height="240" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="bg1" cx="50%" cy="38%" r="65%">
+            <stop offset="0%" stop-color="#152035"/>
+            <stop offset="100%" stop-color="#0A1220"/>
+          </radialGradient>
+          <filter id="glow1">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <rect width="512" height="512" fill="url(#bg1)" rx="52"/>
+        <!-- Outer ring -->
+        <circle cx="256" cy="190" r="108" fill="none" stroke="#C9A84C" stroke-width="2.2"/>
+        <!-- Middle ring -->
+        <circle cx="256" cy="190" r="65" fill="none" stroke="#C9A84C" stroke-width="1.2" opacity="0.38"/>
+        <!-- Crosshair -->
+        <line x1="142" y1="190" x2="228" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+        <line x1="284" y1="190" x2="370" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+        <line x1="256" y1="76"  x2="256" y2="162" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+        <line x1="256" y1="218" x2="256" y2="304" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+        <!-- Tick marks -->
+        <line x1="364" y1="190" x2="380" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+        <line x1="132" y1="190" x2="148" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+        <line x1="256" y1="76"  x2="256" y2="92"  stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+        <line x1="256" y1="288" x2="256" y2="304" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+        <!-- Diagonal ticks -->
+        <line x1="332" y1="114" x2="343" y2="103" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+        <line x1="180" y1="114" x2="169" y2="103" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+        <line x1="332" y1="266" x2="343" y2="277" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+        <line x1="180" y1="266" x2="169" y2="277" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+        <!-- Market arc -->
+        <path d="M 208 248 Q 248 228 276 206 Q 300 188 316 170" fill="none" stroke="#C9A84C" stroke-width="2.0" opacity="0.62" stroke-linecap="round"/>
+        <circle cx="316" cy="170" r="4.5" fill="#C9A84C" opacity="0.82" filter="url(#glow1)"/>
+        <circle cx="208" cy="248" r="2.5" fill="#C9A84C" opacity="0.38"/>
+        <!-- Center -->
+        <circle cx="256" cy="190" r="11"  fill="none" stroke="#C9A84C" stroke-width="0.8" opacity="0.26"/>
+        <circle cx="256" cy="190" r="4.5" fill="#C9A84C" filter="url(#glow1)"/>
+        <!-- Arabic -->
+        <text x="256" y="358" text-anchor="middle" font-family="Cairo, Arial" font-weight="700" font-size="46" fill="#C9A84C" direction="rtl">مرصد السوق</text>
+        <!-- English name -->
+        <text x="256" y="390" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="19" fill="#E8C574" letter-spacing="3" direction="ltr">MARSAD AL SOUQ</text>
+        <!-- Rule -->
+        <line x1="152" y1="406" x2="360" y2="406" stroke="#C9A84C" stroke-width="0.7" opacity="0.28"/>
+        <!-- Tagline -->
+        <text x="256" y="430" text-anchor="middle" font-family="Montserrat, Arial" font-weight="500" font-size="14" fill="#9BA3AF" letter-spacing="4" direction="ltr">MARKET OBSERVATORY</text>
+      </svg>
+      <div class="logo-card-label">512 × 512 — Full Square</div>
+    </div>
+
+    <!-- CIRCLE CROP -->
+    <div class="logo-card">
+      <svg width="200" height="200" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="cc1"><circle cx="256" cy="256" r="256"/></clipPath>
+          <radialGradient id="bg2" cx="50%" cy="38%" r="65%">
+            <stop offset="0%" stop-color="#152035"/>
+            <stop offset="100%" stop-color="#0A1220"/>
+          </radialGradient>
+          <filter id="glow2"><feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <g clip-path="url(#cc1)">
+          <rect width="512" height="512" fill="url(#bg2)"/>
+          <circle cx="256" cy="190" r="108" fill="none" stroke="#C9A84C" stroke-width="2.2"/>
+          <circle cx="256" cy="190" r="65"  fill="none" stroke="#C9A84C" stroke-width="1.2" opacity="0.38"/>
+          <line x1="142" y1="190" x2="228" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="284" y1="190" x2="370" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="256" y1="76"  x2="256" y2="162" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="256" y1="218" x2="256" y2="304" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="364" y1="190" x2="380" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <line x1="132" y1="190" x2="148" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <line x1="256" y1="76"  x2="256" y2="92"  stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <line x1="256" y1="288" x2="256" y2="304" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <path d="M 208 248 Q 248 228 276 206 Q 300 188 316 170" fill="none" stroke="#C9A84C" stroke-width="2.0" opacity="0.62" stroke-linecap="round"/>
+          <circle cx="316" cy="170" r="4.5" fill="#C9A84C" opacity="0.82" filter="url(#glow2)"/>
+          <circle cx="256" cy="190" r="4.5" fill="#C9A84C" filter="url(#glow2)"/>
+          <text x="256" y="358" text-anchor="middle" font-family="Cairo, Arial" font-weight="700" font-size="46" fill="#C9A84C" direction="rtl">مرصد السوق</text>
+          <text x="256" y="390" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="19" fill="#E8C574" letter-spacing="3" direction="ltr">MARSAD AL SOUQ</text>
+          <line x1="152" y1="406" x2="360" y2="406" stroke="#C9A84C" stroke-width="0.7" opacity="0.28"/>
+          <text x="256" y="430" text-anchor="middle" font-family="Montserrat, Arial" font-weight="500" font-size="14" fill="#9BA3AF" letter-spacing="4" direction="ltr">MARKET OBSERVATORY</text>
+        </g>
+      </svg>
+      <div class="logo-card-label">Circle Crop — As Seen on Telegram</div>
+    </div>
+
+    <!-- 40px LEGIBILITY TEST -->
+    <div class="logo-card">
+      <svg width="80" height="80" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="cc2"><circle cx="256" cy="256" r="256"/></clipPath>
+          <radialGradient id="bg3" cx="50%" cy="38%" r="65%">
+            <stop offset="0%" stop-color="#152035"/>
+            <stop offset="100%" stop-color="#0A1220"/>
+          </radialGradient>
+        </defs>
+        <g clip-path="url(#cc2)">
+          <rect width="512" height="512" fill="url(#bg3)"/>
+          <circle cx="256" cy="190" r="108" fill="none" stroke="#C9A84C" stroke-width="2.2"/>
+          <circle cx="256" cy="190" r="65"  fill="none" stroke="#C9A84C" stroke-width="1.2" opacity="0.38"/>
+          <line x1="142" y1="190" x2="228" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="284" y1="190" x2="370" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="256" y1="76"  x2="256" y2="162" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="256" y1="218" x2="256" y2="304" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+          <line x1="364" y1="190" x2="380" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <line x1="132" y1="190" x2="148" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <line x1="256" y1="76"  x2="256" y2="92"  stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <line x1="256" y1="288" x2="256" y2="304" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+          <path d="M 208 248 Q 248 228 276 206 Q 300 188 316 170" fill="none" stroke="#C9A84C" stroke-width="2.0" opacity="0.62" stroke-linecap="round"/>
+          <circle cx="316" cy="170" r="4.5" fill="#C9A84C" opacity="0.82"/>
+          <circle cx="256" cy="190" r="4.5" fill="#C9A84C"/>
+          <text x="256" y="358" text-anchor="middle" font-family="Cairo, Arial" font-weight="700" font-size="46" fill="#C9A84C" direction="rtl">مرصد السوق</text>
+          <text x="256" y="390" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="19" fill="#E8C574" letter-spacing="3" direction="ltr">MARSAD AL SOUQ</text>
+          <line x1="152" y1="406" x2="360" y2="406" stroke="#C9A84C" stroke-width="0.7" opacity="0.28"/>
+          <text x="256" y="430" text-anchor="middle" font-family="Montserrat, Arial" font-weight="500" font-size="14" fill="#9BA3AF" letter-spacing="4" direction="ltr">MARKET OBSERVATORY</text>
+        </g>
+      </svg>
+      <div class="logo-card-label">40px — Legibility Test</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION 2: HORIZONTAL LOCKUP -->
+<div class="section">
+  <div class="section-label">02 — Full Horizontal Lockup (Dark Mode)</div>
+  <div class="logo-row">
+    <div class="logo-card">
+      <svg width="580" height="130" viewBox="0 0 1100 248" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="bgH" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" stop-color="#12203A"/>
+            <stop offset="100%" stop-color="#0A1220"/>
+          </radialGradient>
+          <filter id="glowH">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <rect width="1100" height="248" fill="url(#bgH)" rx="28"/>
+        <!-- Icon (center 124, 124) -->
+        <circle cx="124" cy="124" r="86" fill="none" stroke="#C9A84C" stroke-width="2"/>
+        <circle cx="124" cy="124" r="52" fill="none" stroke="#C9A84C" stroke-width="1.2" opacity="0.35"/>
+        <line x1="32"  y1="124" x2="102" y2="124" stroke="#C9A84C" stroke-width="1.3" opacity="0.75"/>
+        <line x1="146" y1="124" x2="216" y2="124" stroke="#C9A84C" stroke-width="1.3" opacity="0.75"/>
+        <line x1="124" y1="32"  x2="124" y2="102" stroke="#C9A84C" stroke-width="1.3" opacity="0.75"/>
+        <line x1="124" y1="146" x2="124" y2="216" stroke="#C9A84C" stroke-width="1.3" opacity="0.75"/>
+        <line x1="212" y1="124" x2="226" y2="124" stroke="#C9A84C" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="22"  y1="124" x2="36"  y2="124" stroke="#C9A84C" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="124" y1="33"  x2="124" y2="47"  stroke="#C9A84C" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="124" y1="201" x2="124" y2="215" stroke="#C9A84C" stroke-width="2.8" stroke-linecap="round"/>
+        <path d="M 94 162 Q 122 148 144 132 Q 164 118 176 104"
+              fill="none" stroke="#C9A84C" stroke-width="1.8" opacity="0.65" stroke-linecap="round"/>
+        <circle cx="176" cy="104" r="3.8" fill="#C9A84C" opacity="0.85" filter="url(#glowH)"/>
+        <circle cx="124" cy="124" r="9"   fill="none" stroke="#C9A84C" stroke-width="0.7" opacity="0.25"/>
+        <circle cx="124" cy="124" r="3.8" fill="#C9A84C" filter="url(#glowH)"/>
+        <!-- Vertical separator -->
+        <line x1="268" y1="44" x2="268" y2="204" stroke="#1A2744" stroke-width="1.5"/>
+        <!-- Arabic name -->
+        <text x="1070" y="94"
+              text-anchor="end"
+              font-family="Cairo, Arial"
+              font-weight="800"
+              font-size="78"
+              fill="#C9A84C"
+              direction="rtl">مرصد السوق</text>
+        <!-- English name -->
+        <text x="1070" y="140"
+              text-anchor="end"
+              font-family="Montserrat, Arial"
+              font-weight="700"
+              font-size="24"
+              fill="#E8C574"
+              letter-spacing="4"
+              direction="ltr">MARSAD AL SOUQ</text>
+        <!-- Rule -->
+        <line x1="600" y1="158" x2="1070" y2="158" stroke="#C9A84C" stroke-width="0.6" opacity="0.22"/>
+        <!-- Tagline -->
+        <text x="1070" y="188"
+              text-anchor="end"
+              font-family="Montserrat, Arial"
+              font-weight="500"
+              font-size="18"
+              fill="#9BA3AF"
+              letter-spacing="5"
+              direction="ltr">MARKET OBSERVATORY</text>
+      </svg>
+      <div class="logo-card-label">Horizontal Lockup — Banner / Header</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: LIGHT MODE -->
+<div class="section">
+  <div class="section-label">03 — Light Mode Version</div>
+  <div class="logo-row">
+
+    <div class="logo-card" style="background:#F5F4EF; border-radius:20px; padding:32px; border:1px solid #E2E8F0;">
+      <svg width="200" height="200" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="ccL1"><circle cx="256" cy="256" r="256"/></clipPath>
+        </defs>
+        <g clip-path="url(#ccL1)">
+          <rect width="512" height="512" fill="#F5F4EF"/>
+          <circle cx="256" cy="190" r="108" fill="none" stroke="#0D1B2A" stroke-width="2.2"/>
+          <circle cx="256" cy="190" r="65"  fill="none" stroke="#0D1B2A" stroke-width="1.2" opacity="0.28"/>
+          <line x1="142" y1="190" x2="228" y2="190" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+          <line x1="284" y1="190" x2="370" y2="190" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+          <line x1="256" y1="76"  x2="256" y2="162" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+          <line x1="256" y1="218" x2="256" y2="304" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+          <line x1="364" y1="190" x2="380" y2="190" stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+          <line x1="132" y1="190" x2="148" y2="190" stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+          <line x1="256" y1="76"  x2="256" y2="92"  stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+          <line x1="256" y1="288" x2="256" y2="304" stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+          <path d="M 208 248 Q 248 228 276 206 Q 300 188 316 170" fill="none" stroke="#C9A84C" stroke-width="2.2" opacity="0.85" stroke-linecap="round"/>
+          <circle cx="316" cy="170" r="4.5" fill="#C9A84C"/>
+          <circle cx="256" cy="190" r="4.5" fill="#0D1B2A"/>
+          <text x="256" y="358" text-anchor="middle" font-family="Cairo, Arial" font-weight="700" font-size="46" fill="#0D1B2A" direction="rtl">مرصد السوق</text>
+          <text x="256" y="390" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="19" fill="#C9A84C" letter-spacing="3" direction="ltr">MARSAD AL SOUQ</text>
+          <line x1="152" y1="406" x2="360" y2="406" stroke="#0D1B2A" stroke-width="0.6" opacity="0.18"/>
+          <text x="256" y="430" text-anchor="middle" font-family="Montserrat, Arial" font-weight="500" font-size="14" fill="#4B5563" letter-spacing="4" direction="ltr">MARKET OBSERVATORY</text>
+        </g>
+      </svg>
+      <div class="logo-card-label" style="color:#9BA3AF;">Light Mode — Circle Crop</div>
+    </div>
+
+    <div class="logo-card" style="background:#F5F4EF; border-radius:20px; padding:32px; border:1px solid #E2E8F0;">
+      <svg width="200" height="200" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <rect width="512" height="512" fill="#F5F4EF" rx="52"/>
+        <circle cx="256" cy="190" r="108" fill="none" stroke="#0D1B2A" stroke-width="2.2"/>
+        <circle cx="256" cy="190" r="65"  fill="none" stroke="#0D1B2A" stroke-width="1.2" opacity="0.28"/>
+        <line x1="142" y1="190" x2="228" y2="190" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+        <line x1="284" y1="190" x2="370" y2="190" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+        <line x1="256" y1="76"  x2="256" y2="162" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+        <line x1="256" y1="218" x2="256" y2="304" stroke="#0D1B2A" stroke-width="1.4" opacity="0.65"/>
+        <line x1="364" y1="190" x2="380" y2="190" stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+        <line x1="132" y1="190" x2="148" y2="190" stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+        <line x1="256" y1="76"  x2="256" y2="92"  stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+        <line x1="256" y1="288" x2="256" y2="304" stroke="#0D1B2A" stroke-width="3" stroke-linecap="round"/>
+        <path d="M 208 248 Q 248 228 276 206 Q 300 188 316 170" fill="none" stroke="#C9A84C" stroke-width="2.2" opacity="0.85" stroke-linecap="round"/>
+        <circle cx="316" cy="170" r="4.5" fill="#C9A84C"/>
+        <circle cx="256" cy="190" r="4.5" fill="#0D1B2A"/>
+        <text x="256" y="358" text-anchor="middle" font-family="Cairo, Arial" font-weight="700" font-size="46" fill="#0D1B2A" direction="rtl">مرصد السوق</text>
+        <text x="256" y="390" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="19" fill="#C9A84C" letter-spacing="3" direction="ltr">MARSAD AL SOUQ</text>
+        <line x1="152" y1="406" x2="360" y2="406" stroke="#0D1B2A" stroke-width="0.6" opacity="0.18"/>
+        <text x="256" y="430" text-anchor="middle" font-family="Montserrat, Arial" font-weight="500" font-size="14" fill="#4B5563" letter-spacing="4" direction="ltr">MARKET OBSERVATORY</text>
+      </svg>
+      <div class="logo-card-label" style="color:#9BA3AF;">Light Mode — Square</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION 4: ICON ONLY (all sizes) -->
+<div class="section">
+  <div class="section-label">04 — Icon Only (All Sizes)</div>
+  <div class="logo-row">
+    <svg width="160" height="160" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="iclg"><circle cx="256" cy="256" r="256"/></clipPath>
+        <radialGradient id="bgI" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stop-color="#152035"/><stop offset="100%" stop-color="#0A1220"/>
+        </radialGradient>
+      </defs>
+      <g clip-path="url(#iclg)">
+        <rect width="512" height="512" fill="url(#bgI)"/>
+        <circle cx="256" cy="256" r="170" fill="none" stroke="#C9A84C" stroke-width="3.5"/>
+        <circle cx="256" cy="256" r="104" fill="none" stroke="#C9A84C" stroke-width="2" opacity="0.35"/>
+        <line x1="78"  y1="256" x2="212" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="300" y1="256" x2="434" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="78"  x2="256" y2="212" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="300" x2="256" y2="434" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="428" y1="256" x2="448" y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="64"  y1="256" x2="84"  y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="64"  x2="256" y2="84"  stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="428" x2="256" y2="448" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M 200 318 Q 250 290 286 262 Q 318 238 340 212" fill="none" stroke="#C9A84C" stroke-width="2.8" opacity="0.65" stroke-linecap="round"/>
+        <circle cx="340" cy="212" r="7" fill="#C9A84C" opacity="0.85"/>
+        <circle cx="256" cy="256" r="14" fill="none" stroke="#C9A84C" stroke-width="1" opacity="0.25"/>
+        <circle cx="256" cy="256" r="7"  fill="#C9A84C"/>
+      </g>
+    </svg>
+    <svg width="96" height="96" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="icmd"><circle cx="256" cy="256" r="256"/></clipPath></defs>
+      <g clip-path="url(#icmd)">
+        <rect width="512" height="512" fill="#0D1B2A"/>
+        <circle cx="256" cy="256" r="170" fill="none" stroke="#C9A84C" stroke-width="3.5"/>
+        <circle cx="256" cy="256" r="104" fill="none" stroke="#C9A84C" stroke-width="2" opacity="0.35"/>
+        <line x1="78"  y1="256" x2="212" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="300" y1="256" x2="434" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="78"  x2="256" y2="212" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="300" x2="256" y2="434" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="428" y1="256" x2="448" y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="64"  y1="256" x2="84"  y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="64"  x2="256" y2="84"  stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="428" x2="256" y2="448" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M 200 318 Q 250 290 286 262 Q 318 238 340 212" fill="none" stroke="#C9A84C" stroke-width="2.8" opacity="0.65" stroke-linecap="round"/>
+        <circle cx="340" cy="212" r="7" fill="#C9A84C"/>
+        <circle cx="256" cy="256" r="7"  fill="#C9A84C"/>
+      </g>
+    </svg>
+    <svg width="64" height="64" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="icsm"><circle cx="256" cy="256" r="256"/></clipPath></defs>
+      <g clip-path="url(#icsm)">
+        <rect width="512" height="512" fill="#0D1B2A"/>
+        <circle cx="256" cy="256" r="170" fill="none" stroke="#C9A84C" stroke-width="3.5"/>
+        <circle cx="256" cy="256" r="104" fill="none" stroke="#C9A84C" stroke-width="2" opacity="0.35"/>
+        <line x1="78"  y1="256" x2="212" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="300" y1="256" x2="434" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="78"  x2="256" y2="212" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="300" x2="256" y2="434" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="428" y1="256" x2="448" y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="64"  y1="256" x2="84"  y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="64"  x2="256" y2="84"  stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="428" x2="256" y2="448" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M 200 318 Q 250 290 286 262 Q 318 238 340 212" fill="none" stroke="#C9A84C" stroke-width="2.8" opacity="0.65" stroke-linecap="round"/>
+        <circle cx="340" cy="212" r="7" fill="#C9A84C"/>
+        <circle cx="256" cy="256" r="7"  fill="#C9A84C"/>
+      </g>
+    </svg>
+    <svg width="40" height="40" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="icxs"><circle cx="256" cy="256" r="256"/></clipPath></defs>
+      <g clip-path="url(#icxs)">
+        <rect width="512" height="512" fill="#0D1B2A"/>
+        <circle cx="256" cy="256" r="170" fill="none" stroke="#C9A84C" stroke-width="3.5"/>
+        <circle cx="256" cy="256" r="104" fill="none" stroke="#C9A84C" stroke-width="2" opacity="0.35"/>
+        <line x1="78"  y1="256" x2="212" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="300" y1="256" x2="434" y2="256" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="78"  x2="256" y2="212" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="256" y1="300" x2="256" y2="434" stroke="#C9A84C" stroke-width="2" opacity="0.75"/>
+        <line x1="428" y1="256" x2="448" y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="64"  y1="256" x2="84"  y2="256" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="64"  x2="256" y2="84"  stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <line x1="256" y1="428" x2="256" y2="448" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="340" cy="212" r="9" fill="#C9A84C"/>
+        <circle cx="256" cy="256" r="9"  fill="#C9A84C"/>
+      </g>
+    </svg>
+  </div>
+  <div style="color:#4B5563; font-size:10px; letter-spacing:3px; text-transform:uppercase; text-align:center; direction:ltr;">
+    160px &nbsp;·&nbsp; 96px &nbsp;·&nbsp; 64px &nbsp;·&nbsp; 40px (Telegram minimum)
+  </div>
+</div>
+
+<!-- SECTION 5: COLOR PALETTE -->
+<div class="section">
+  <div class="section-label">05 — Brand Color Palette</div>
+  <div class="color-row">
+    <div class="chip"><div class="chip-swatch" style="background:#0D1B2A;"></div><div class="chip-hex">#0D1B2A</div><div class="chip-name">Deep Navy</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#1A2744;"></div><div class="chip-hex">#1A2744</div><div class="chip-name">Midnight</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#111827;"></div><div class="chip-hex">#111827</div><div class="chip-name">Charcoal</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#C9A84C; border-color:rgba(0,0,0,0.1);"></div><div class="chip-hex">#C9A84C</div><div class="chip-name">Prestige Gold</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#E8C574; border-color:rgba(0,0,0,0.1);"></div><div class="chip-hex">#E8C574</div><div class="chip-name">Light Gold</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#F5F4EF; border-color:rgba(0,0,0,0.1);"></div><div class="chip-hex">#F5F4EF</div><div class="chip-name">Off-White</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#9BA3AF;"></div><div class="chip-hex">#9BA3AF</div><div class="chip-name">Steel Gray</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#059669;"></div><div class="chip-hex">#059669</div><div class="chip-name">Signal Green</div></div>
+    <div class="chip"><div class="chip-swatch" style="background:#DC2626;"></div><div class="chip-hex">#DC2626</div><div class="chip-name">Signal Red</div></div>
+  </div>
+</div>
+
+<footer>مرصد السوق &nbsp;·&nbsp; Marsad Al Souq &nbsp;·&nbsp; Brand Identity 2025</footer>
+
+</body>
+</html>

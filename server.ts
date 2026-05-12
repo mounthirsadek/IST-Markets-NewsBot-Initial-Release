@@ -1352,28 +1352,59 @@ async function startServer() {
         .sort((a: any, b: any) => a.time.localeCompare(b.time));
     }
 
-    // ── 1. Try FMP ───────────────────────────────────────────────────────────
-    const apiKey = process.env.FMP_API_KEY;
-    if (apiKey) {
+    // ── 1. Try Finnhub (free tier, best date support) ────────────────────────
+    const finnhubKey = process.env.FINNHUB_API_KEY;
+    if (finnhubKey) {
       try {
-        const fmpUrl = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${date}&to=${date}&apikey=${apiKey}`;
-        const fmpRes = await axios.get(fmpUrl, { timeout: 8000 });
-        const events = normaliseFMP(Array.isArray(fmpRes.data) ? fmpRes.data : []);
-        console.log(`[Calendar] FMP returned ${events.length} events for ${date}`);
+        const fhUrl = `https://finnhub.io/api/v1/calendar/economic?from=${date}&to=${date}&token=${finnhubKey}`;
+        const fhRes = await axios.get(fhUrl, { timeout: 8000 });
+        const raw: any[] = fhRes.data?.economicCalendar || [];
+        const events = raw.map((e: any) => {
+          // Finnhub time: "2024-01-05 13:30:00" UTC
+          const rawT: string = e.time || '';
+          const time = rawT.includes(' ') ? rawT.split(' ')[1]?.slice(0, 5) || '00:00' : '00:00';
+          const actual   = e.actual   != null && e.actual   !== '' ? String(e.actual)   : undefined;
+          const forecast = e.estimate != null && e.estimate !== '' ? String(e.estimate) : undefined;
+          const previous = e.prev     != null && e.prev     !== '' ? String(e.prev)     : undefined;
+          let result: 'beat'|'miss'|'neutral' = 'neutral';
+          if (actual && forecast) {
+            const a = parseFloat(actual), f = parseFloat(forecast);
+            if (!isNaN(a) && !isNaN(f)) result = a > f ? 'beat' : a < f ? 'miss' : 'neutral';
+          }
+          const impStr = (e.impact || '').toLowerCase();
+          const impact: 'high'|'medium'|'low' = impStr === 'high' ? 'high' : impStr === 'medium' ? 'medium' : 'low';
+          return { time, country: e.country || '', event: e.event || '', actual, forecast, previous, impact, result };
+        }).sort((a: any, b: any) => a.time.localeCompare(b.time));
+
+        console.log(`[Calendar] Finnhub returned ${events.length} events for ${date}`);
         return res.json(events);
-      } catch (fmpErr: any) {
-        const status = fmpErr.response?.status;
-        console.warn(`[Calendar] FMP failed (${status || fmpErr.message}) — falling back to Forex Factory`);
+      } catch (fhErr: any) {
+        console.warn(`[Calendar] Finnhub failed (${fhErr.response?.status || fhErr.message})`);
       }
     }
 
-    // ── 2. Fallback: Forex Factory free JSON ─────────────────────────────────
+    // ── 2. Try FMP ───────────────────────────────────────────────────────────
+    const fmpKey = process.env.FMP_API_KEY;
+    if (fmpKey) {
+      try {
+        const fmpUrl = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${date}&to=${date}&apikey=${fmpKey}`;
+        const fmpRes = await axios.get(fmpUrl, { timeout: 8000 });
+        const events = normaliseFMP(Array.isArray(fmpRes.data) ? fmpRes.data : []);
+        if (events.length > 0) {
+          console.log(`[Calendar] FMP returned ${events.length} events for ${date}`);
+          return res.json(events);
+        }
+      } catch (fmpErr: any) {
+        console.warn(`[Calendar] FMP failed (${fmpErr.response?.status || fmpErr.message})`);
+      }
+    }
+
+    // ── 3. Fallback: Forex Factory free JSON (no key, current/next week only) ─
     try {
       const targetDate = new Date(date);
       const now = new Date();
       const diffDays = Math.round((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-      // Try current-week first; if date is >3 days ahead, also try next-week
       const urls = diffDays > 3
         ? ['https://nfs.faireconomy.media/ff_calendar_nextweek.json', 'https://nfs.faireconomy.media/ff_calendar_thisweek.json']
         : ['https://nfs.faireconomy.media/ff_calendar_thisweek.json', 'https://nfs.faireconomy.media/ff_calendar_nextweek.json'];
@@ -1382,8 +1413,7 @@ async function startServer() {
       for (const ffUrl of urls) {
         try {
           const ffRes = await axios.get(ffUrl, { timeout: 8000 });
-          const raw = Array.isArray(ffRes.data) ? ffRes.data : [];
-          ffEvents = normaliseFF(raw, date);
+          ffEvents = normaliseFF(Array.isArray(ffRes.data) ? ffRes.data : [], date);
           if (ffEvents.length > 0) break;
         } catch { /* try next URL */ }
       }
@@ -1391,8 +1421,8 @@ async function startServer() {
       console.log(`[Calendar] ForexFactory returned ${ffEvents.length} events for ${date}`);
       res.json(ffEvents);
     } catch (ffErr: any) {
-      console.error('[Calendar] Both sources failed:', ffErr.message);
-      res.status(503).json({ error: 'تعذّر جلب البيانات من المصادر المتاحة. يرجى المحاولة لاحقاً أو إدخال الأحداث يدوياً.' });
+      console.error('[Calendar] All sources failed:', ffErr.message);
+      res.status(503).json({ error: 'تعذّر جلب البيانات. أضف FINNHUB_API_KEY في .env لتفعيل الجلب التلقائي لجميع التواريخ.' });
     }
   });
 

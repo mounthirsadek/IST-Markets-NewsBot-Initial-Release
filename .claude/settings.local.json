@@ -41,7 +41,13 @@
       "Bash(npm install:*)",
       "WebSearch",
       "Bash(where gh:*)",
-      "Bash(where git:*)"
+      "Bash(where git:*)",
+      "Bash(dir \"D:\\\\Cloude\\\\IST Markets NewsBot\" /b)",
+      "Bash(findstr -i \"service\\\\|account\\\\|credential\\\\|firebase\\\\|key\\\\|json\")",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: update Firebase config to new project istnewsbot1 *)",
+      "Bash(git push *)"
     ]
   }
 }

@@ -617,31 +617,34 @@ export default function MarsadCards() {
                     }} />
                 </label>
 
-                {/* AI analysis button — visible once screenshot is uploaded */}
-                {pot.screenshotImage && (
-                  <button
-                    onClick={() => pot.screenshotImage && handleAnalyzePOT(pot.screenshotImage)}
-                    disabled={analyzingPOT}
-                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
-                    style={{
-                      background: 'linear-gradient(135deg, #052e16 0%, #065f46 100%)',
-                      border: '1px solid #10B98160',
-                      color: '#6ee7b7',
-                    }}
-                  >
-                    {analyzingPOT ? (
-                      <>
-                        <div className="w-4 h-4 rounded-full border-2 border-[#6ee7b7] border-t-transparent animate-spin" />
-                        جارٍ استخراج الصفقات…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={15} />
-                        تحليل الشاشة وتعبئة الصفقات تلقائياً
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* AI analysis button — always shown, disabled until screenshot is uploaded */}
+                <button
+                  onClick={() => pot.screenshotImage && handleAnalyzePOT(pot.screenshotImage)}
+                  disabled={!pot.screenshotImage || analyzingPOT}
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: pot.screenshotImage
+                      ? 'linear-gradient(135deg, #052e16 0%, #065f46 100%)'
+                      : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${pot.screenshotImage ? '#10B98160' : 'rgba(255,255,255,0.08)'}`,
+                    color: pot.screenshotImage ? '#6ee7b7' : 'rgba(255,255,255,0.25)',
+                    cursor: pot.screenshotImage ? 'pointer' : 'not-allowed',
+                    opacity: analyzingPOT ? 0.7 : 1,
+                  }}
+                >
+                  {analyzingPOT ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-[#6ee7b7] border-t-transparent animate-spin" />
+                      جارٍ استخراج الصفقات…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={15} />
+                      تحليل الشاشة وتعبئة الصفقات تلقائياً
+                      {!pot.screenshotImage && <span className="text-[10px] opacity-60 mr-1">(ارفع صورة أولاً)</span>}
+                    </>
+                  )}
+                </button>
 
                 {/* Thumbnail preview */}
                 {pot.screenshotImage && (

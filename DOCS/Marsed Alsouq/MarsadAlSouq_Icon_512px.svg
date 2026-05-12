@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="65%">
+      <stop offset="0%" stop-color="#152035"/>
+      <stop offset="100%" stop-color="#0A1220"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg)" rx="60"/>
+
+  <!-- ── SCOPE ICON (center 256, 190) ── -->
+
+  <!-- Outer ring -->
+  <circle cx="256" cy="190" r="108" fill="none" stroke="#C9A84C" stroke-width="2.2"/>
+  <!-- Middle ring -->
+  <circle cx="256" cy="190" r="65" fill="none" stroke="#C9A84C" stroke-width="1.2" opacity="0.38"/>
+
+  <!-- Crosshair lines (28px gap at center) -->
+  <line x1="142" y1="190" x2="228" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+  <line x1="284" y1="190" x2="370" y2="190" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+  <line x1="256" y1="76"  x2="256" y2="162" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+  <line x1="256" y1="218" x2="256" y2="304" stroke="#C9A84C" stroke-width="1.4" opacity="0.75"/>
+
+  <!-- Tick marks at cardinal points -->
+  <line x1="364" y1="190" x2="380" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+  <line x1="132" y1="190" x2="148" y2="190" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="76"  x2="256" y2="92"  stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="288" x2="256" y2="304" stroke="#C9A84C" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Diagonal tick marks 45° (subtle) -->
+  <line x1="332" y1="114" x2="343" y2="103" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+  <line x1="180" y1="114" x2="169" y2="103" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+  <line x1="332" y1="266" x2="343" y2="277" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+  <line x1="180" y1="266" x2="169" y2="277" stroke="#C9A84C" stroke-width="1.2" opacity="0.28"/>
+
+  <!-- Rising market arc -->
+  <path d="M 208 248 Q 248 228 276 206 Q 300 188 316 170"
+        fill="none" stroke="#C9A84C" stroke-width="2.0"
+        opacity="0.62" stroke-linecap="round"/>
+  <!-- Node dot at arc tip -->
+  <circle cx="316" cy="170" r="4.5" fill="#C9A84C" opacity="0.82" filter="url(#glow)"/>
+  <!-- Tiny dot at arc base -->
+  <circle cx="208" cy="248" r="2.5" fill="#C9A84C" opacity="0.38"/>
+
+  <!-- Center: halo + dot -->
+  <circle cx="256" cy="190" r="11"  fill="none" stroke="#C9A84C" stroke-width="0.8" opacity="0.26"/>
+  <circle cx="256" cy="190" r="4.5" fill="#C9A84C" filter="url(#glow)"/>
+
+  <!-- ── TEXT BLOCK ── -->
+
+  <!-- Arabic wordmark -->
+  <text x="256" y="358"
+        text-anchor="middle"
+        font-family="Cairo, Arial, sans-serif"
+        font-weight="700"
+        font-size="46"
+        fill="#C9A84C"
+        direction="rtl">مرصد السوق</text>
+
+  <!-- English name -->
+  <text x="256" y="390"
+        text-anchor="middle"
+        font-family="Montserrat, Arial, sans-serif"
+        font-weight="700"
+        font-size="19"
+        fill="#E8C574"
+        letter-spacing="3"
+        direction="ltr">MARSAD AL SOUQ</text>
+
+  <!-- Thin rule -->
+  <line x1="152" y1="406" x2="360" y2="406" stroke="#C9A84C" stroke-width="0.7" opacity="0.28"/>
+
+  <!-- English tagline -->
+  <text x="256" y="430"
+        text-anchor="middle"
+        font-family="Montserrat, Arial, sans-serif"
+        font-weight="500"
+        font-size="14"
+        fill="#9BA3AF"
+        letter-spacing="4"
+        direction="ltr">MARKET OBSERVATORY</text>
+</svg>
