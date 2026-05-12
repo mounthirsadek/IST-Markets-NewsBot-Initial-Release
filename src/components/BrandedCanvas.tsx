@@ -95,6 +95,10 @@ const GOLD  = '#C9A84C';
 const GOLD2 = '#E8C574';
 const PAD   = 44;
 
+/** How far from the bottom of the card the footer zone starts — shared constant
+ *  so both drawMarsadFooter and the POT dynamic layout stay in sync. */
+const MARSAD_FOOTER_OFFSET = 195;
+
 /** Draw outer matte + inner navy gradient card; returns card bounds */
 function drawMarsadBg(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const frame = 10, rx = 14;
@@ -210,52 +214,49 @@ async function drawMarsadFooter(
   tagline = '',
   disclaimer = ''
 ) {
-  const footerY = cardY + cardH - 150;
-  const footerH = 140;
+  const footerY = cardY + cardH - MARSAD_FOOTER_OFFSET;
 
-  drawGoldRule(ctx, cardX, footerY, cardW, 0.20);
+  drawGoldRule(ctx, cardX, footerY, cardW, 0.25);
 
   const maxTextW = cardW - PAD * 2;
-  let curY = footerY + 14;
+  let curY = footerY + 12;
 
-  // ── Logo ──────────────────────────────────────────────────────────────────
+  // ── Logo — prominent, fully opaque ───────────────────────────────────────
   if (logoUrl) {
     const logo = await loadImg(logoUrl);
     if (logo.width > 0) {
-      const lh = tagline || disclaimer ? 40 : 48;
-      const lw = (logo.width / logo.height) * lh;
-      ctx.save();
-      ctx.globalAlpha = 0.92;
+      // Height scales with canvas width; always large enough to be legible
+      const lh = tagline || disclaimer ? 64 : 80;
+      const lw = Math.min((logo.width / logo.height) * lh, cardW - PAD * 2);
       ctx.drawImage(logo, cardX + (cardW - lw) / 2, curY, lw, lh);
-      ctx.restore();
-      curY += lh + 8;
+      curY += lh + 10;
     }
   }
 
   // ── Tagline (fixedTagline from Brand Identity) ────────────────────────────
   if (tagline) {
-    const tagFontSz = Math.round(width * 0.017);
-    ctx.font         = `500 ${tagFontSz}px Cairo, Arial, sans-serif`;
+    const tagFontSz = Math.round(width * 0.019);
+    ctx.font         = `600 ${tagFontSz}px Cairo, Arial, sans-serif`;
     ctx.direction    = 'rtl';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle    = GOLD + 'BB';
+    ctx.fillStyle    = GOLD + 'CC';
     // Truncate if too wide
     let tag = tagline;
     while (ctx.measureText(tag).width > maxTextW && tag.length > 4) tag = tag.slice(0, -1);
     if (tag !== tagline) tag += '…';
     ctx.fillText(tag, cardX + cardW / 2, curY);
-    curY += tagFontSz * 1.4 + 4;
+    curY += tagFontSz * 1.4 + 5;
   }
 
   // ── Disclaimer (footerDisclaimer from Brand Identity) ────────────────────
   if (disclaimer) {
-    const discFontSz = Math.round(width * 0.014);
+    const discFontSz = Math.round(width * 0.015);
     ctx.font         = `400 ${discFontSz}px Cairo, Arial, sans-serif`;
     ctx.direction    = 'rtl';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle    = 'rgba(255,255,255,0.28)';
+    ctx.fillStyle    = 'rgba(255,255,255,0.32)';
     let disc = disclaimer;
     while (ctx.measureText(disc).width > maxTextW && disc.length > 4) disc = disc.slice(0, -1);
     if (disc !== disclaimer) disc += '…';
@@ -742,8 +743,8 @@ async function renderMarsadProofOfTrades(
   const tHdrH       = 52;
   const rowH        = 80;
   const totalH      = 72;
-  // footerY matches drawMarsadFooter constant: cardY + cardH - 150
-  const footerStartY = cardY + cardH - 150;
+  // footerY matches drawMarsadFooter constant
+  const footerStartY = cardY + cardH - MARSAD_FOOTER_OFFSET;
   const totalY       = footerStartY - 20 - totalH;
   const tHdrY        = totalY - 6 - tradesSlice.length * rowH - tHdrH;
   const sepY         = tHdrY - 16;

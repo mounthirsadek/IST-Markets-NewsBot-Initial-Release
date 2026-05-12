@@ -100,8 +100,8 @@ export default function MarsadCards() {
     ]).then(([marsad, ist]) => {
       const m = (marsad?.value) || {};
       const i = (ist?.value)    || {};
-      // Marsad settings override IST; IST logo fills in if Marsad logo is missing
-      setBrandSettings({ logoUrl: i.logoUrl || '', ...m });
+      // Marsad settings take priority; IST logo fills in only if Marsad logo absent
+      setBrandSettings({ ...m, logoUrl: m.logoUrl || i.logoUrl || '' });
     });
   }, []);
 
