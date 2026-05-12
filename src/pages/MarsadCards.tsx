@@ -793,8 +793,8 @@ export default function MarsadCards() {
           headline=""
           accentColor={activeBrand.accentColor}
           logoUrl={brandSettings?.logoUrl || ''}
-          tagline=""
-          disclaimer=""
+          tagline={brandSettings?.fixedTagline || ''}
+          disclaimer={brandSettings?.footerDisclaimer || ''}
           language="ar"
           width={1080}
           height={1350}

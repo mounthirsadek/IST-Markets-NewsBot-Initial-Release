@@ -120,15 +120,22 @@ function drawMarsadBg(ctx: CanvasRenderingContext2D, width: number, height: numb
   return { cardX, cardY, cardW, cardH };
 }
 
-/** Scope icon + "مرصد السوق" + separator; returns ruleY */
+/**
+ * Header: scope-icon + "مرصد السوق" as a tight right-aligned unit,
+ * then a gold separator, then the English date on the LEFT below the line.
+ * Returns the ruleY so callers know where the header ends.
+ */
 async function drawMarsadScopeHeader(
   ctx: CanvasRenderingContext2D,
   width: number,
   cardX: number, cardY: number, cardW: number
 ): Promise<number> {
   const iconSize = 52;
-  const iconX = cardX + cardW - PAD - iconSize;
-  const iconY = cardY + 28;
+  const iconY    = cardY + 26;
+  const iconX    = cardX + cardW - PAD - iconSize;     // far-right edge with padding
+  const iconMidY = iconY + iconSize / 2;               // vertical center of icon
+
+  // ── Draw scope icon ──────────────────────────────────────────────────────
   const iconImg = await loadImg(marsadIconUrl);
   if (iconImg.width > 0) {
     ctx.save();
@@ -138,25 +145,42 @@ async function drawMarsadScopeHeader(
     ctx.restore();
   }
 
+  // ── Draw "مرصد السوق" immediately to the LEFT of the icon ─────────────
   const fontSz = Math.round(width * 0.052);
   ctx.save();
-  ctx.shadowColor  = 'rgba(0,0,0,0.8)';
-  ctx.shadowBlur   = 14;
+  ctx.shadowColor  = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur   = 12;
   ctx.font         = `900 ${fontSz}px Cairo, Arial, sans-serif`;
   ctx.direction    = 'rtl';
   ctx.textAlign    = 'right';
-  ctx.textBaseline = 'top';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle    = GOLD;
-  ctx.fillText('مرصد السوق', cardX + cardW - PAD, cardY + 34);
+  // right edge of text = left edge of icon − 12 px gap
+  ctx.fillText('مرصد السوق', iconX - 12, iconMidY);
   ctx.restore();
 
-  const ruleY = cardY + 34 + fontSz * 1.1 + 8;
-  ctx.strokeStyle = GOLD + '40';
-  ctx.lineWidth   = 0.8;
+  // ── Gold separator line ──────────────────────────────────────────────────
+  const ruleY = iconY + iconSize + 16;
+  const sepGrad = ctx.createLinearGradient(cardX + PAD, 0, cardX + cardW - PAD, 0);
+  sepGrad.addColorStop(0,   GOLD + '00');
+  sepGrad.addColorStop(0.3, GOLD + 'AA');
+  sepGrad.addColorStop(0.7, GOLD + 'AA');
+  sepGrad.addColorStop(1,   GOLD + '00');
+  ctx.strokeStyle = sepGrad;
+  ctx.lineWidth   = 0.9;
   ctx.beginPath();
   ctx.moveTo(cardX + PAD, ruleY);
   ctx.lineTo(cardX + cardW - PAD, ruleY);
   ctx.stroke();
+
+  // ── English date — left side, below separator ────────────────────────────
+  const dateStr = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+  ctx.font         = `400 ${Math.round(width * 0.018)}px Cairo, Arial, sans-serif`;
+  ctx.direction    = 'ltr';
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle    = 'rgba(255,255,255,0.42)';
+  ctx.fillText(dateStr, cardX + PAD, ruleY + 10);
 
   return ruleY;
 }
@@ -174,48 +198,71 @@ function drawGoldRule(
   ctx.stroke();
 }
 
-/** Standard footer: separator + date (right) + logo (center) + "بدعم من" (left) */
+/**
+ * Footer: gold rule → logo (center) → tagline → disclaimer
+ * All three come from Brand Identity settings stored in the DB.
+ */
 async function drawMarsadFooter(
   ctx: CanvasRenderingContext2D,
   width: number,
   cardX: number, cardY: number, cardW: number, cardH: number,
-  logoUrl: string
+  logoUrl: string,
+  tagline = '',
+  disclaimer = ''
 ) {
-  const footerY = cardY + cardH - 145;
-  const footerH = 135;
+  const footerY = cardY + cardH - 150;
+  const footerH = 140;
 
-  drawGoldRule(ctx, cardX, footerY, cardW, 0.18);
+  drawGoldRule(ctx, cardX, footerY, cardW, 0.20);
 
-  // Date
-  const dateStr = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
-  ctx.font         = `400 ${Math.round(width * 0.020)}px Cairo, Arial, sans-serif`;
-  ctx.direction    = 'rtl';
-  ctx.textAlign    = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle    = 'rgba(255,255,255,0.55)';
-  ctx.fillText(dateStr, cardX + cardW - PAD, footerY + footerH * 0.30);
+  const maxTextW = cardW - PAD * 2;
+  let curY = footerY + 14;
 
-  // Logo center
+  // ── Logo ──────────────────────────────────────────────────────────────────
   if (logoUrl) {
     const logo = await loadImg(logoUrl);
     if (logo.width > 0) {
-      const lh = 36, lw = (logo.width / logo.height) * lh;
+      const lh = tagline || disclaimer ? 40 : 48;
+      const lw = (logo.width / logo.height) * lh;
       ctx.save();
-      ctx.globalAlpha = 0.80;
-      ctx.drawImage(logo, cardX + (cardW - lw) / 2, footerY + (footerH - lh) / 2, lw, lh);
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(logo, cardX + (cardW - lw) / 2, curY, lw, lh);
       ctx.restore();
+      curY += lh + 8;
     }
   }
 
-  // "بدعم من"
-  ctx.font         = `400 ${Math.round(width * 0.019)}px Cairo, Arial, sans-serif`;
-  ctx.direction    = 'ltr';
-  ctx.textAlign    = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle    = 'rgba(255,255,255,0.32)';
-  ctx.fillText('بدعم من IST Markets', cardX + PAD, footerY + footerH * 0.70);
+  // ── Tagline (fixedTagline from Brand Identity) ────────────────────────────
+  if (tagline) {
+    const tagFontSz = Math.round(width * 0.017);
+    ctx.font         = `500 ${tagFontSz}px Cairo, Arial, sans-serif`;
+    ctx.direction    = 'rtl';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle    = GOLD + 'BB';
+    // Truncate if too wide
+    let tag = tagline;
+    while (ctx.measureText(tag).width > maxTextW && tag.length > 4) tag = tag.slice(0, -1);
+    if (tag !== tagline) tag += '…';
+    ctx.fillText(tag, cardX + cardW / 2, curY);
+    curY += tagFontSz * 1.4 + 4;
+  }
 
-  // Card border
+  // ── Disclaimer (footerDisclaimer from Brand Identity) ────────────────────
+  if (disclaimer) {
+    const discFontSz = Math.round(width * 0.014);
+    ctx.font         = `400 ${discFontSz}px Cairo, Arial, sans-serif`;
+    ctx.direction    = 'rtl';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle    = 'rgba(255,255,255,0.28)';
+    let disc = disclaimer;
+    while (ctx.measureText(disc).width > maxTextW && disc.length > 4) disc = disc.slice(0, -1);
+    if (disc !== disclaimer) disc += '…';
+    ctx.fillText(disc, cardX + cardW / 2, curY);
+  }
+
+  // ── Card border ───────────────────────────────────────────────────────────
   ctx.save();
   roundedRectPath(ctx, cardX, cardY, cardW, cardH, 14);
   ctx.strokeStyle = GOLD2 + '22';
@@ -268,7 +315,7 @@ async function renderMarsadSignal(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: SignalData,
-  logoUrl: string
+  logoUrl: string, tagline = '', disclaimer = ''
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -433,7 +480,7 @@ async function renderMarsadSignal(
   ctx.fillStyle = GOLD;
   ctx.fillText(`نسبة المخاطرة:  ${data.rrRatio}`, cardX + cardW - PAD, contentEndY + Math.round(10 * s));
 
-  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl);
+  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -444,7 +491,7 @@ async function renderMarsadCalendar(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: CalendarData,
-  logoUrl: string
+  logoUrl: string, tagline = '', disclaimer = ''
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -596,7 +643,7 @@ async function renderMarsadCalendar(
     legX -= 20;
   }
 
-  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl);
+  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -607,7 +654,7 @@ async function renderMarsadProofOfTrades(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: ProofOfTradesData,
-  logoUrl: string
+  logoUrl: string, tagline = '', disclaimer = ''
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -640,8 +687,8 @@ async function renderMarsadProofOfTrades(
   const tHdrH       = 52;
   const rowH        = 80;
   const totalH      = 72;
-  // footerY matches drawMarsadFooter constant: cardY + cardH - 145
-  const footerStartY = cardY + cardH - 145;
+  // footerY matches drawMarsadFooter constant: cardY + cardH - 150
+  const footerStartY = cardY + cardH - 150;
   const totalY       = footerStartY - 20 - totalH;
   const tHdrY        = totalY - 6 - tradesSlice.length * rowH - tHdrH;
   const sepY         = tHdrY - 16;
@@ -785,7 +832,7 @@ async function renderMarsadProofOfTrades(
   const totalStr = (data.totalProfit >= 0 ? '+' : '') + data.totalProfit.toFixed(2) + ' $';
   ctx.fillText(totalStr, tableX + 16, totalY + totalH / 2);
 
-  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl);
+  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -796,7 +843,7 @@ async function renderMarsadWebinar(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: WebinarData,
-  logoUrl: string
+  logoUrl: string, tagline = '', disclaimer = ''
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -942,7 +989,7 @@ async function renderMarsadWebinar(
     ctx.fillText('يقدمها: ' + data.hostName, cx, contentY + 10);
   }
 
-  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl);
+  await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
 }
 
 // ── Marsad Al Souq NEWS canvas renderer (original — unchanged) ───────────────
@@ -1001,36 +1048,8 @@ async function renderMarsad(
 
   ctx.restore();
 
-  const iconSize = 52;
-  const iconX = cardX + cardW - pad - iconSize;
-  const iconY = cardY + 28;
-  const iconImg = await loadImg(marsadIconUrl);
-  if (iconImg.width > 0) {
-    ctx.save();
-    roundedRectPath(ctx, iconX, iconY, iconSize, iconSize, 10);
-    ctx.clip();
-    ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
-    ctx.restore();
-  }
-
-  ctx.save();
-  ctx.shadowColor   = 'rgba(0,0,0,0.8)';
-  ctx.shadowBlur    = 14;
-  ctx.font          = `900 ${Math.round(width * 0.052)}px Cairo, Arial, sans-serif`;
-  ctx.direction     = 'rtl';
-  ctx.textAlign     = 'right';
-  ctx.textBaseline  = 'top';
-  ctx.fillStyle     = gold;
-  ctx.fillText('مرصد السوق', cardX + cardW - pad, cardY + 34);
-  ctx.restore();
-
-  const ruleY = cardY + 34 + Math.round(width * 0.052) * 1.1 + 8;
-  ctx.strokeStyle = gold + '40';
-  ctx.lineWidth   = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(cardX + pad, ruleY);
-  ctx.lineTo(cardX + cardW - pad, ruleY);
-  ctx.stroke();
+  // Use the shared header (icon+text side-by-side + English date)
+  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
 
   const headlineStartY = imgZoneY + imgZoneH - 20;
   const fontSize  = Math.round(width * 0.062);
@@ -1159,13 +1178,13 @@ export default function BrandedCanvas({
       // ── Marsad Al Souq theme ──────────────────────────────────────────────
       if (brandId === 'marsad-alsouq') {
         if (cardType === 'signal' && cardData) {
-          await renderMarsadSignal(ctx, width, height, cardData as SignalData, logoUrl);
+          await renderMarsadSignal(ctx, width, height, cardData as SignalData, logoUrl, tagline, disclaimer);
         } else if (cardType === 'calendar' && cardData) {
-          await renderMarsadCalendar(ctx, width, height, cardData as CalendarData, logoUrl);
+          await renderMarsadCalendar(ctx, width, height, cardData as CalendarData, logoUrl, tagline, disclaimer);
         } else if (cardType === 'proof-of-trades' && cardData) {
-          await renderMarsadProofOfTrades(ctx, width, height, cardData as ProofOfTradesData, logoUrl);
+          await renderMarsadProofOfTrades(ctx, width, height, cardData as ProofOfTradesData, logoUrl, tagline, disclaimer);
         } else if (cardType === 'webinar' && cardData) {
-          await renderMarsadWebinar(ctx, width, height, cardData as WebinarData, logoUrl);
+          await renderMarsadWebinar(ctx, width, height, cardData as WebinarData, logoUrl, tagline, disclaimer);
         } else {
           // Default: Marsad news card
           await renderMarsad(ctx, width, height, {
