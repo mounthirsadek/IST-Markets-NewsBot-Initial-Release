@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight, Sparkles, User, ImageIcon, X } from 'lucide-react';
+import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight, Sparkles, User, ImageIcon, X, Loader2, AlertCircle } from 'lucide-react';
 import { useBrandStore } from '../context/BrandContext';
 import { fetchWithAuth } from '../lib/api';
 import BrandedCanvas from '../components/BrandedCanvas';
+import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
 import type {
   CardType, SignalData, CalendarData, CalendarEvent,
   ProofOfTradesData, TradeEntry, WebinarData,
@@ -31,7 +32,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 
 const QUICK_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'BTCUSD', 'US500'];
 const TIMEFRAMES  = ['M15', 'H1', 'H4', 'D1', 'W1'];
-const PLATFORMS   = ['تيليغرام', 'زوم', 'يوتيوب', 'أخرى'];
+const PLATFORMS   = ['Telegram', 'Zoom', 'YouTube', 'Other'];
 
 function emptySignal(): SignalData {
   return { pair: 'XAUUSD', direction: 'BUY', assetType: 'Forex', timeframe: 'H1', entry: 0, stopLoss: 0, takeProfit: 0, rrRatio: '—' };
@@ -43,7 +44,7 @@ function emptyPOT(): ProofOfTradesData {
   return { period: '', trades: [emptyTrade()], totalProfit: 0 };
 }
 function emptyWebinar(): WebinarData {
-  return { title: '', dateAr: '', timeAr: '', platform: 'تيليغرام', bookingUrl: '', tags: [] };
+  return { title: '', dateAr: '', timeAr: '', platform: 'Telegram', bookingUrl: '', tags: [] };
 }
 function emptyCalendar(): CalendarData {
   return { date: TODAY, events: [] };
@@ -51,10 +52,10 @@ function emptyCalendar(): CalendarData {
 
 // ── Tabs config ───────────────────────────────────────────────────────────────
 const TABS: { id: CardType; label: string; icon: typeof Zap; color: string }[] = [
-  { id: 'signal',          label: 'إشارة تداول',       icon: TrendingUp, color: '#C9A84C' },
-  { id: 'calendar',        label: 'الأجندة الاقتصادية', icon: Calendar,   color: '#2AABEE' },
-  { id: 'proof-of-trades', label: 'إثبات الصفقات',     icon: Zap,        color: '#10B981' },
-  { id: 'webinar',         label: 'إعلان ندوة',        icon: Radio,      color: '#A855F7' },
+  { id: 'signal',          label: 'Trading Signal',    icon: TrendingUp, color: '#C9A84C' },
+  { id: 'calendar',        label: 'Economic Calendar', icon: Calendar,   color: '#2AABEE' },
+  { id: 'proof-of-trades', label: 'Proof of Trades',  icon: Zap,        color: '#10B981' },
+  { id: 'webinar',         label: 'Webinar',           icon: Radio,      color: '#A855F7' },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -91,6 +92,16 @@ export default function MarsadCards() {
   // New tag input
   const [newTag, setNewTag] = useState('');
 
+  // ── Metricool state ──────────────────────────────────────────────────────────
+  const [metricoolOpen, setMetricoolOpen]           = useState(false);
+  const [mcBrands, setMcBrands]                     = useState<MetricoolBrand[]>([]);
+  const [mcSelectedBrand, setMcSelectedBrand]       = useState<MetricoolBrand | null>(null);
+  const [mcSelectedNetworks, setMcSelectedNetworks] = useState<string[]>([]);
+  const [mcLoading, setMcLoading]                   = useState(false);
+  const [mcSuccess, setMcSuccess]                   = useState(false);
+  const [mcError, setMcError]                       = useState('');
+  const [mcScheduledAt, setMcScheduledAt]           = useState('');
+
   // ── Load brand settings ── fetch both Marsad and IST Markets; use IST logo
   // as fallback when Marsad brand settings haven't been configured yet
   useEffect(() => {
@@ -124,7 +135,7 @@ export default function MarsadCards() {
       if (!res.ok) throw new Error((await res.json()).error);
       const events: CalendarEvent[] = await res.json();
       setCalendar(prev => ({ ...prev, events }));
-      showToast('success', `تم جلب ${events.length} حدث`);
+      showToast('success', `Fetched ${events.length} events`);
     } catch (e: any) {
       showToast('error', e.message);
     } finally {
@@ -160,9 +171,9 @@ export default function MarsadCards() {
         events,
       }));
 
-      showToast('success', `تم استخراج ${events.length} حدث من الصورة ✓`);
+      showToast('success', `Extracted ${events.length} events ✓`);
     } catch (e: any) {
-      showToast('error', 'فشل التحليل: ' + e.message);
+      showToast('error', 'Analysis failed: ' + e.message);
     } finally {
       setAnalyzingCalendar(false);
     }
@@ -193,10 +204,10 @@ export default function MarsadCards() {
         chartImage:  imageBase64,
       }));
 
-      const conf = data.confidence === 'high' ? 'عالية ✓' : data.confidence === 'medium' ? 'متوسطة' : 'منخفضة';
-      showToast('success', `تم تحليل الشارت — ثقة: ${conf}`);
+      const conf = data.confidence === 'high' ? 'high ✓' : data.confidence === 'medium' ? 'medium' : 'low';
+      showToast('success', `Chart analysed — confidence: ${conf}`);
     } catch (e: any) {
-      showToast('error', 'فشل التحليل: ' + e.message);
+      showToast('error', 'Analysis failed: ' + e.message);
     } finally {
       setAnalyzing(false);
     }
@@ -230,10 +241,10 @@ export default function MarsadCards() {
         trades: newTrades.length > 0 ? newTrades : prev.trades,
       }));
 
-      const conf = data.confidence === 'high' ? 'عالية ✓' : data.confidence === 'medium' ? 'متوسطة' : 'منخفضة';
-      showToast('success', `تم تحليل ${newTrades.length} صفقة — ثقة: ${conf}`);
+      const conf = data.confidence === 'high' ? 'high ✓' : data.confidence === 'medium' ? 'medium' : 'low';
+      showToast('success', `Analysed ${newTrades.length} trades — confidence: ${conf}`);
     } catch (e: any) {
-      showToast('error', 'فشل التحليل: ' + e.message);
+      showToast('error', 'Analysis failed: ' + e.message);
     } finally {
       setAnalyzingPOT(false);
     }
@@ -241,7 +252,7 @@ export default function MarsadCards() {
 
   // ── Generate Webinar card using gpt-image-1 ───────────────────────────────
   const handleGenerateWebinar = useCallback(async () => {
-    if (!webinar.title.trim()) return showToast('error', 'أدخل عنوان الندوة أولاً');
+    if (!webinar.title.trim()) return showToast('error', 'Enter a webinar title first');
     setGeneratingWebinar(true);
     try {
       const res = await fetchWithAuth('/api/marsad/generate-webinar', {
@@ -260,9 +271,9 @@ export default function MarsadCards() {
       if (!res.ok) throw new Error((await res.json()).error);
       const { dataUrl } = await res.json();
       setAiWebinarImage(dataUrl);
-      showToast('success', 'تم توليد التصميم بالذكاء الاصطناعي ✨');
+      showToast('success', 'AI design generated ✨');
     } catch (e: any) {
-      showToast('error', 'فشل توليد التصميم: ' + e.message);
+      showToast('error', 'Design generation failed: ' + e.message);
     } finally {
       setGeneratingWebinar(false);
     }
@@ -292,7 +303,7 @@ export default function MarsadCards() {
 
   // ── Download PNG ──────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
-    if (!activeImageUrl) return showToast('info', 'انتظر تحميل البطاقة…');
+    if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
     const a = document.createElement('a');
     a.href = activeImageUrl;
     a.download = `marsad-${activeTab}-${Date.now()}.png`;
@@ -301,7 +312,7 @@ export default function MarsadCards() {
 
   // ── Publish to Telegram ───────────────────────────────────────────────────
   const handlePublish = useCallback(async () => {
-    if (!activeImageUrl) return showToast('info', 'انتظر تحميل البطاقة…');
+    if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
     setPublishing(true);
     try {
       // Convert data URL → blob → upload
@@ -310,15 +321,15 @@ export default function MarsadCards() {
       form.append('file', blob, `marsad-${activeTab}.jpg`);
 
       const upRes = await fetchWithAuth('/api/upload-brand-asset', { method: 'POST', body: form, headers: {} as any });
-      if (!upRes.ok) throw new Error('فشل رفع الصورة');
+      if (!upRes.ok) throw new Error('Failed to upload image');
       const { url } = await upRes.json();
 
       const caption = activeTab === 'signal'
-        ? `${signal.pair} ${signal.direction}\nدخول: ${signal.entry}  |  وقف: ${signal.stopLoss}  |  هدف: ${signal.takeProfit}\nالنسبة: ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}`
+        ? `${signal.pair} ${signal.direction}\nEntry: ${signal.entry}  |  SL: ${signal.stopLoss}  |  TP: ${signal.takeProfit}\nR:R: ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}`
         : activeTab === 'calendar'
-          ? `الأجندة الاقتصادية — ${calendar.date}`
+          ? `Economic Calendar — ${calendar.date}`
           : activeTab === 'proof-of-trades'
-            ? `إثبات الصفقات — ${pot.period}\nالإجمالي: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit} $`
+            ? `Proof of Trades — ${pot.period}\nTotal: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit} $`
             : `${webinar.title}\n${webinar.dateAr}  |  ${webinar.timeAr}\n${webinar.bookingUrl}`;
 
       const tgRes = await fetchWithAuth('/api/telegram/send', {
@@ -326,7 +337,7 @@ export default function MarsadCards() {
         body: JSON.stringify({ imageUrl: url, caption, brandId: activeBrand.id }),
       });
       if (!tgRes.ok) throw new Error((await tgRes.json()).error);
-      showToast('success', 'تم النشر على تيليغرام ✓');
+      showToast('success', 'Posted to Telegram ✓');
     } catch (e: any) {
       showToast('error', e.message);
     } finally {
@@ -342,6 +353,78 @@ export default function MarsadCards() {
       reader.readAsDataURL(file);
     });
 
+  // ── Metricool helpers ────────────────────────────────────────────────────────
+  const openMetricool = async () => {
+    if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
+    setMetricoolOpen(true);
+    setMcSuccess(false);
+    setMcError('');
+    if (!mcBrands.length) {
+      setMcLoading(true);
+      try {
+        const brands = await fetchMetricoolBrands();
+        setMcBrands(brands);
+        if (brands.length > 0) {
+          setMcSelectedBrand(brands[0]);
+          setMcSelectedNetworks(getConnectedNetworks(brands[0]).map(n => n.key));
+        }
+      } catch (e: any) {
+        setMcError(e.message);
+      } finally {
+        setMcLoading(false);
+      }
+    }
+  };
+
+  const handleBrandChange = (brand: MetricoolBrand) => {
+    setMcSelectedBrand(brand);
+    setMcSelectedNetworks(getConnectedNetworks(brand).map(n => n.key));
+  };
+
+  const toggleNetwork = (key: string) => {
+    setMcSelectedNetworks(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const uploadForMetricool = async (dataUrl: string): Promise<string> => {
+    const blob = await (await fetch(dataUrl)).blob();
+    const form = new FormData();
+    form.append('file', blob, `marsad-${activeTab}-${Date.now()}.jpg`);
+    const res = await fetchWithAuth('/api/upload-brand-asset', { method: 'POST', body: form, headers: {} as any });
+    if (!res.ok) throw new Error('Failed to upload image for Metricool');
+    const { url } = await res.json();
+    return `${window.location.origin}${url}`;
+  };
+
+  const handleMetricoolSend = async () => {
+    if (!mcSelectedBrand || mcSelectedNetworks.length === 0) return;
+    setMcLoading(true);
+    setMcError('');
+    try {
+      const imageUrl = await uploadForMetricool(activeImageUrl);
+      const caption = activeTab === 'signal'
+        ? `${signal.pair} ${signal.direction} | Entry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit} | R:R ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}\n\n#MarsadAlSouq #TradingSignal #${signal.pair}`
+        : activeTab === 'calendar'
+        ? `Economic Calendar — ${calendar.date}\n\n#MarsadAlSouq #EconomicCalendar #ForexNews`
+        : activeTab === 'proof-of-trades'
+        ? `Proof of Trades — ${pot.period}\nTotal P&L: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit}$\n\n#MarsadAlSouq #ProofOfTrades #Results`
+        : `${webinar.title}\n${webinar.dateAr} | ${webinar.timeAr}\n${webinar.bookingUrl}\n\n#MarsadAlSouq #Webinar`;
+      await scheduleToMetricool({
+        blogId: mcSelectedBrand.id,
+        networks: mcSelectedNetworks,
+        imageUrl,
+        caption,
+        scheduledAt: mcScheduledAt || undefined,
+      });
+      setMcSuccess(true);
+    } catch (e: any) {
+      setMcError(e.message);
+    } finally {
+      setMcLoading(false);
+    }
+  };
+
   // ── Current card data for canvas ─────────────────────────────────────────
   const currentCardData = activeTab === 'signal' ? signal
     : activeTab === 'calendar' ? calendar
@@ -355,7 +438,7 @@ export default function MarsadCards() {
 
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div dir="rtl" className="flex flex-col h-full overflow-hidden bg-[#0a0a0a] text-white">
+    <div className="flex flex-col h-full overflow-hidden bg-[#0a0a0a] text-white">
 
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {toast && (
@@ -399,7 +482,7 @@ export default function MarsadCards() {
             <>
               {/* Quick-select pairs */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">الأداة المالية</label>
+                <label className="block text-xs text-white/40 mb-2">Instrument</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {QUICK_PAIRS.map(p => (
                     <button key={p}
@@ -414,14 +497,14 @@ export default function MarsadCards() {
                 <input
                   value={signal.pair}
                   onChange={e => setSignal(s => ({ ...s, pair: e.target.value.toUpperCase() }))}
-                  placeholder="أو اكتب رمزاً (EURUSD…)"
+                  placeholder="Or type a symbol (EURUSD…)"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#C9A84C]"
                 />
               </div>
 
               {/* Asset type */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">نوع الأصل</label>
+                <label className="block text-xs text-white/40 mb-2">Asset Type</label>
                 <div className="flex gap-2 flex-wrap">
                   {(['Forex','Crypto','Indices','Commodities'] as const).map(at => (
                     <button key={at}
@@ -438,7 +521,7 @@ export default function MarsadCards() {
               {/* Direction + Timeframe */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/40 mb-2">الاتجاه</label>
+                  <label className="block text-xs text-white/40 mb-2">Direction</label>
                   <div className="flex gap-2">
                     {(['BUY','SELL'] as const).map(d => (
                       <button key={d}
@@ -448,13 +531,13 @@ export default function MarsadCards() {
                             ? d === 'BUY' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
                             : 'bg-white/5 text-white/40 hover:bg-white/10'
                         }`}>
-                        {d === 'BUY' ? '▲ شراء' : '▼ بيع'}
+                        {d === 'BUY' ? '▲ BUY' : '▼ SELL'}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-2">الإطار الزمني</label>
+                  <label className="block text-xs text-white/40 mb-2">Timeframe</label>
                   <div className="flex gap-1.5 flex-wrap">
                     {TIMEFRAMES.map(tf => (
                       <button key={tf}
@@ -472,9 +555,9 @@ export default function MarsadCards() {
               {/* Entry / Stop / TP */}
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'سعر الدخول', key: 'entry',     color: '#C9A84C' },
-                  { label: 'وقف الخسارة', key: 'stopLoss', color: '#EF4444' },
-                  { label: 'جني الأرباح', key: 'takeProfit',color: '#10B981' },
+                  { label: 'Entry',       key: 'entry',      color: '#C9A84C' },
+                  { label: 'Stop Loss',   key: 'stopLoss',   color: '#EF4444' },
+                  { label: 'Take Profit', key: 'takeProfit', color: '#10B981' },
                 ].map(({ label, key, color }) => (
                   <div key={key}>
                     <label className="block text-xs mb-1" style={{ color }}>{label}</label>
@@ -492,17 +575,17 @@ export default function MarsadCards() {
 
               {/* R:R */}
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/30">
-                <span className="text-xs text-white/50">نسبة المخاطرة:</span>
+                <span className="text-xs text-white/50">Risk:Reward:</span>
                 <span className="font-bold text-[#C9A84C] font-mono">{signal.rrRatio}</span>
               </div>
 
               {/* Setup notes */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">ملاحظات الإعداد (اختياري)</label>
+                <label className="block text-xs text-white/40 mb-2">Setup Notes (optional)</label>
                 <textarea
                   value={signal.setupNotes || ''}
                   onChange={e => setSignal(s => ({ ...s, setupNotes: e.target.value }))}
-                  placeholder="اكتب وصفاً للإشارة بالعربية…"
+                  placeholder="Describe the setup…"
                   rows={3}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#C9A84C]"
                 />
@@ -510,13 +593,13 @@ export default function MarsadCards() {
 
               {/* Chart image upload + AI analysis */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">لقطة الرسم البياني</label>
+                <label className="block text-xs text-white/40 mb-2">Chart Screenshot</label>
 
                 {/* Upload button */}
                 <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-xl px-4 py-3 hover:border-[#C9A84C]/50 transition-colors">
                   <ChevronRight size={16} className="text-white/30" />
                   <span className="text-sm text-white/40">
-                    {signal.chartImage ? 'تم رفع الصورة ✓ — اضغط لتغييرها' : 'اضغط لرفع لقطة الشاشة'}
+                    {signal.chartImage ? 'Uploaded ✓ — click to change' : 'Click to upload screenshot'}
                   </span>
                   <input type="file" accept="image/*" className="hidden"
                     onChange={async e => {
@@ -542,12 +625,12 @@ export default function MarsadCards() {
                     {analyzing ? (
                       <>
                         <div className="w-4 h-4 rounded-full border-2 border-[#c4b5fd] border-t-transparent animate-spin" />
-                        جارٍ التحليل بالذكاء الاصطناعي…
+                        Analysing with AI…
                       </>
                     ) : (
                       <>
                         <Sparkles size={15} />
-                        تحليل الشارت بالذكاء الاصطناعي
+                        AI Chart Analysis
                       </>
                     )}
                   </button>
@@ -570,10 +653,10 @@ export default function MarsadCards() {
               <div className="rounded-2xl border border-[#2AABEE]/25 bg-[#071828] p-4 space-y-3">
                 <div className="flex items-center gap-2 mb-0.5">
                   <Sparkles size={14} className="text-[#2AABEE]" />
-                  <span className="text-xs font-semibold text-[#2AABEE]">استخراج الأحداث من لقطة الشاشة</span>
+                  <span className="text-xs font-semibold text-[#2AABEE]">Extract Events from Screenshot</span>
                 </div>
                 <p className="text-[11px] text-white/35 leading-relaxed">
-                  التقط لقطة شاشة من أي موقع (Investing.com، Forex Factory…) ثم ارفعها — الذكاء الاصطناعي يستخرج جميع الأحداث تلقائياً.
+                  Take a screenshot from any calendar site (Investing.com, Forex Factory…) — AI extracts all events automatically.
                 </p>
 
                 {/* Upload zone */}
@@ -583,7 +666,7 @@ export default function MarsadCards() {
                   ) : (
                     <>
                       <Calendar size={24} className="text-[#2AABEE]/40" />
-                      <span className="text-sm text-white/35">اضغط لرفع لقطة الأجندة</span>
+                      <span className="text-sm text-white/35">Click to upload calendar screenshot</span>
                       <span className="text-[10px] text-white/20">PNG / JPG / WebP</span>
                     </>
                   )}
@@ -610,13 +693,13 @@ export default function MarsadCards() {
                   {analyzingCalendar ? (
                     <>
                       <div className="w-4 h-4 rounded-full border-2 border-[#7dd3fc] border-t-transparent animate-spin" />
-                      جارٍ استخراج الأحداث…
+                      Extracting events…
                     </>
                   ) : (
                     <>
                       <Sparkles size={15} />
-                      استخراج الأحداث بالذكاء الاصطناعي
-                      {!calendarScreenshot && <span className="text-[10px] opacity-60 mr-1">(ارفع صورة أولاً)</span>}
+                      AI Extract Events
+                      {!calendarScreenshot && <span className="text-[10px] opacity-60 ml-1">(upload image first)</span>}
                     </>
                   )}
                 </button>
@@ -625,7 +708,7 @@ export default function MarsadCards() {
               {/* ── Divider ─────────────────────────────────────────────── */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-white/8" />
-                <span className="text-[10px] text-white/25">أو جلب من API</span>
+                <span className="text-[10px] text-white/25">or fetch from API</span>
                 <div className="flex-1 h-px bg-white/8" />
               </div>
 
@@ -647,7 +730,7 @@ export default function MarsadCards() {
               {calendar.events.length > 0 && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-white/40">الأحداث ({calendar.events.length})</label>
+                    <label className="text-xs text-white/40">Events ({calendar.events.length})</label>
                     <div className="flex gap-1">
                       {(['high','medium','low'] as const).map(imp => (
                         <button key={imp}
@@ -655,12 +738,12 @@ export default function MarsadCards() {
                           className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                             imp === 'high' ? 'bg-red-500/20 text-red-400' : imp === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'
                           }`}>
-                          {imp === 'high' ? 'عالي' : imp === 'medium' ? 'متوسط' : 'منخفض'}
+                          {imp === 'high' ? 'High' : imp === 'medium' ? 'Medium' : 'Low'}
                         </button>
                       ))}
                       <button onClick={() => { setCalendarScreenshot(''); setCalendar(c => ({ ...c, events: [] })); }}
                         className="px-2 py-0.5 rounded text-[10px] text-white/25 hover:text-red-400 transition-colors">
-                        مسح ✕
+                        Clear ✕
                       </button>
                     </div>
                   </div>
@@ -687,7 +770,7 @@ export default function MarsadCards() {
 
               {calendar.events.length === 0 && !calendarScreenshot && (
                 <div className="text-center py-6 text-white/20 text-xs">
-                  ارفع لقطة شاشة أعلاه لاستخراج الأحداث تلقائياً
+                  Upload a screenshot above to auto-extract events
                 </div>
               )}
             </>
@@ -697,21 +780,21 @@ export default function MarsadCards() {
           {activeTab === 'proof-of-trades' && (
             <>
               <div>
-                <label className="block text-xs text-white/40 mb-2">الفترة الزمنية</label>
+                <label className="block text-xs text-white/40 mb-2">Period</label>
                 <input
                   value={pot.period}
                   onChange={e => setPot(p => ({ ...p, period: e.target.value }))}
-                  placeholder="مثال: أبريل 2025"
+                  placeholder="e.g. April 2025"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#10B981]"
                 />
               </div>
 
               {/* Screenshot upload + AI analysis */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">لقطة شاشة MT5 (اختياري)</label>
+                <label className="block text-xs text-white/40 mb-2">MT5 Screenshot (optional)</label>
                 <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-xl px-4 py-3 hover:border-[#10B981]/50 transition-colors">
                   <span className="text-sm text-white/40">
-                    {pot.screenshotImage ? 'تم رفع الصورة ✓ — اضغط لتغييرها' : 'اضغط لرفع لقطة الشاشة'}
+                    {pot.screenshotImage ? 'Uploaded ✓ — click to change' : 'Click to upload screenshot'}
                   </span>
                   <input type="file" accept="image/*" className="hidden"
                     onChange={async e => {
@@ -738,13 +821,13 @@ export default function MarsadCards() {
                   {analyzingPOT ? (
                     <>
                       <div className="w-4 h-4 rounded-full border-2 border-[#6ee7b7] border-t-transparent animate-spin" />
-                      جارٍ استخراج الصفقات…
+                      Extracting trades…
                     </>
                   ) : (
                     <>
                       <Sparkles size={15} />
-                      تحليل الشاشة وتعبئة الصفقات تلقائياً
-                      {!pot.screenshotImage && <span className="text-[10px] opacity-60 mr-1">(ارفع صورة أولاً)</span>}
+                      AI Auto-fill Trades
+                      {!pot.screenshotImage && <span className="text-[10px] opacity-60 ml-1">(upload image first)</span>}
                     </>
                   )}
                 </button>
@@ -760,11 +843,11 @@ export default function MarsadCards() {
               {/* Trade rows */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-white/40">الصفقات ({pot.trades.length})</label>
+                  <label className="text-xs text-white/40">Trades ({pot.trades.length})</label>
                   <button
                     onClick={() => setPot(p => ({ ...p, trades: [...p.trades, emptyTrade()] }))}
                     className="flex items-center gap-1 text-xs text-[#10B981] hover:text-[#10B981]/80">
-                    <Plus size={12} /> إضافة صفقة
+                    <Plus size={12} /> Add Trade
                   </button>
                 </div>
 
@@ -776,7 +859,7 @@ export default function MarsadCards() {
                           value={trade.symbol}
                           onChange={e => setPot(p => ({ ...p, trades: p.trades.map((t, j) => j === i ? { ...t, symbol: e.target.value.toUpperCase() } : t) }))}
                           className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none"
-                          placeholder="الرمز"
+                          placeholder="Symbol"
                         />
                         <div className="flex gap-1">
                           {(['BUY','SELL'] as const).map(d => (
@@ -798,10 +881,10 @@ export default function MarsadCards() {
                       </div>
                       <div className="grid grid-cols-4 gap-1.5">
                         {[
-                          { label: 'الحجم', key: 'lots', step: '0.01' },
-                          { label: 'الدخول', key: 'entryPrice', step: '0.01' },
-                          { label: 'الإغلاق', key: 'closePrice', step: '0.01' },
-                          { label: 'الربح $', key: 'profit', step: '0.01' },
+                          { label: 'Lots',  key: 'lots',       step: '0.01' },
+                          { label: 'Entry', key: 'entryPrice', step: '0.01' },
+                          { label: 'Close', key: 'closePrice', step: '0.01' },
+                          { label: 'P&L $', key: 'profit',    step: '0.01' },
                         ].map(({ label, key, step }) => (
                           <div key={key}>
                             <div className="text-[9px] text-white/30 mb-0.5">{label}</div>
@@ -820,7 +903,7 @@ export default function MarsadCards() {
 
                 {/* Total */}
                 <div className="flex items-center justify-between mt-3 px-4 py-2.5 rounded-xl bg-emerald-900/20 border border-emerald-800/40">
-                  <span className="text-xs text-white/50">الإجمالي:</span>
+                  <span className="text-xs text-white/50">Total:</span>
                   <span className={`font-bold font-mono text-sm ${pot.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {pot.totalProfit >= 0 ? '+' : ''}{pot.totalProfit.toFixed(2)} $
                   </span>
@@ -833,18 +916,18 @@ export default function MarsadCards() {
           {activeTab === 'webinar' && (
             <>
               <div>
-                <label className="block text-xs text-white/40 mb-2">عنوان الندوة *</label>
+                <label className="block text-xs text-white/40 mb-2">Webinar Title *</label>
                 <textarea
                   value={webinar.title}
                   onChange={e => setWebinar(w => ({ ...w, title: e.target.value }))}
-                  placeholder="اكتب عنوان الندوة بالعربية…"
+                  placeholder="Enter webinar title…"
                   rows={3}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#A855F7]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-white/40 mb-2">عنوان فرعي (اختياري)</label>
+                <label className="block text-xs text-white/40 mb-2">Subtitle (optional)</label>
                 <input
                   value={webinar.subtitle || ''}
                   onChange={e => setWebinar(w => ({ ...w, subtitle: e.target.value }))}
@@ -854,7 +937,7 @@ export default function MarsadCards() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/40 mb-2">التاريخ (عربي)</label>
+                  <label className="block text-xs text-white/40 mb-2">Date</label>
                   <input
                     value={webinar.dateAr}
                     onChange={e => setWebinar(w => ({ ...w, dateAr: e.target.value }))}
@@ -863,7 +946,7 @@ export default function MarsadCards() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-2">الوقت (عربي)</label>
+                  <label className="block text-xs text-white/40 mb-2">Time</label>
                   <input
                     value={webinar.timeAr}
                     onChange={e => setWebinar(w => ({ ...w, timeAr: e.target.value }))}
@@ -875,7 +958,7 @@ export default function MarsadCards() {
 
               {/* Platform */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">المنصة</label>
+                <label className="block text-xs text-white/40 mb-2">Platform</label>
                 <div className="flex gap-2 flex-wrap">
                   {PLATFORMS.map(p => (
                     <button key={p}
@@ -891,7 +974,7 @@ export default function MarsadCards() {
 
               {/* Booking URL + QR */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">رابط التسجيل (سيتحوّل لرمز QR)</label>
+                <label className="block text-xs text-white/40 mb-2">Registration Link (generates QR code)</label>
                 <input
                   value={webinar.bookingUrl}
                   onChange={e => setWebinar(w => ({ ...w, bookingUrl: e.target.value }))}
@@ -899,7 +982,7 @@ export default function MarsadCards() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#A855F7]"
                   dir="ltr"
                 />
-                {qrLoading && <p className="text-xs text-white/30 mt-1">جارٍ توليد QR…</p>}
+                {qrLoading && <p className="text-xs text-white/30 mt-1">Generating QR…</p>}
                 {webinar.qrDataUrl && (
                   <div className="mt-2 flex justify-center">
                     <img src={webinar.qrDataUrl} alt="QR" className="w-20 h-20 rounded-lg border border-[#C9A84C]/30" />
@@ -909,7 +992,7 @@ export default function MarsadCards() {
 
               {/* Tags */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">الوسوم</label>
+                <label className="block text-xs text-white/40 mb-2">Tags</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {(webinar.tags || []).map((tag, i) => (
                     <span key={i} className="flex items-center gap-1 px-2.5 py-1 bg-[#A855F7]/20 border border-[#A855F7]/40 rounded-lg text-xs text-[#A855F7]">
@@ -924,7 +1007,7 @@ export default function MarsadCards() {
                     value={newTag}
                     onChange={e => setNewTag(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && newTag.trim()) { setWebinar(w => ({ ...w, tags: [...(w.tags||[]), newTag.trim()] })); setNewTag(''); } }}
-                    placeholder="أضف وسماً…"
+                    placeholder="Add tag…"
                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs focus:outline-none"
                   />
                   <button
@@ -937,7 +1020,7 @@ export default function MarsadCards() {
 
               {/* Host name */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">اسم المقدِّم (اختياري)</label>
+                <label className="block text-xs text-white/40 mb-2">Host Name (optional)</label>
                 <input
                   value={webinar.hostName || ''}
                   onChange={e => setWebinar(w => ({ ...w, hostName: e.target.value }))}
@@ -947,11 +1030,11 @@ export default function MarsadCards() {
 
               {/* Presenter photo upload */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">صورة المقدِّم (اختياري — لتصميم AI)</label>
+                <label className="block text-xs text-white/40 mb-2">Presenter Photo (optional — for AI design)</label>
                 <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-xl px-4 py-3 hover:border-[#A855F7]/50 transition-colors">
                   <User size={15} className="text-white/30 shrink-0" />
                   <span className="text-sm text-white/40">
-                    {webinar.presenterImage ? 'تم رفع الصورة ✓ — اضغط لتغييرها' : 'ارفع صورة المقدِّم للتصميم AI'}
+                    {webinar.presenterImage ? 'Uploaded ✓ — click to change' : 'Upload presenter photo for AI design'}
                   </span>
                   <input type="file" accept="image/*" className="hidden"
                     onChange={async e => {
@@ -964,7 +1047,7 @@ export default function MarsadCards() {
                     <img src={webinar.presenterImage} alt="presenter" className="w-12 h-12 rounded-full object-cover border-2 border-[#A855F7]/50" />
                     <button onClick={() => setWebinar(w => ({ ...w, presenterImage: undefined }))}
                       className="text-xs text-white/30 hover:text-red-400 transition-colors flex items-center gap-1">
-                      <X size={12} /> إزالة الصورة
+                      <X size={12} /> Remove
                     </button>
                   </div>
                 )}
@@ -988,17 +1071,17 @@ export default function MarsadCards() {
                   {generatingWebinar ? (
                     <>
                       <div className="w-4 h-4 rounded-full border-2 border-[#f3e8ff] border-t-transparent animate-spin" />
-                      جارٍ التصميم بـ ChatGPT Image…
+                      Generating with ChatGPT Image…
                     </>
                   ) : (
                     <>
                       <ImageIcon size={16} />
-                      تصميم احترافي بالذكاء الاصطناعي ✨
+                      AI Professional Design ✨
                     </>
                   )}
                 </button>
                 <p className="text-[10px] text-white/20 text-center mt-1">
-                  يستخدم GPT Image لإنشاء تصميم احترافي بهوية مرصد السوق
+                  Uses GPT Image to create a professional Marsad Al Souq design
                 </p>
 
                 {/* Reset AI design */}
@@ -1007,7 +1090,7 @@ export default function MarsadCards() {
                     onClick={() => setAiWebinarImage('')}
                     className="mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs text-white/30 hover:text-red-400 border border-white/5 hover:border-red-400/20 transition-all"
                   >
-                    <X size={11} /> إلغاء التصميم AI والعودة للبطاقة الافتراضية
+                    <X size={11} /> Cancel AI Design — use default card
                   </button>
                 )}
               </div>
@@ -1017,15 +1100,20 @@ export default function MarsadCards() {
           {/* ── Action buttons ────────────────────────────────────────────── */}
           <div className="flex gap-2 pt-2 sticky bottom-0 bg-[#0a0a0a] pb-1">
             <button onClick={handleDownload}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-              <Download size={15} />
-              تحميل PNG
+              className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+              <Download size={14} />
+              Download
+            </button>
+            <button onClick={openMetricool} disabled={!activeImageUrl}
+              className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium bg-purple-500/10 border border-purple-500/25 text-purple-300 hover:bg-purple-500/20 transition-colors disabled:opacity-40">
+              <Radio size={14} />
+              Metricool
             </button>
             <button onClick={handlePublish} disabled={publishing}
               style={{ backgroundColor: accent + '20', borderColor: accent + '60', color: accent }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border transition-all hover:opacity-80 disabled:opacity-50">
-              <Send size={15} />
-              {publishing ? 'جارٍ النشر…' : 'نشر على تيليغرام'}
+              className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium border transition-all hover:opacity-80 disabled:opacity-50">
+              <Send size={14} />
+              {publishing ? 'Posting…' : 'Telegram'}
             </button>
           </div>
         </div>
@@ -1034,7 +1122,7 @@ export default function MarsadCards() {
         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-8 px-4 bg-[#060606]">
           {/* Header row: label + AI badge */}
           <div className="mb-4 flex items-center gap-3">
-            <span className="text-xs text-white/25 font-mono tracking-wide">معاينة البطاقة • 1080 × 1350</span>
+            <span className="text-xs text-white/25 font-mono tracking-wide">Card Preview • 1080 × 1350</span>
             {activeTab === 'webinar' && aiWebinarImage && (
               <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
                 style={{ background: 'linear-gradient(90deg,#5b21b6,#9333ea)', color: '#f3e8ff' }}>
@@ -1044,7 +1132,7 @@ export default function MarsadCards() {
             {activeTab === 'webinar' && generatingWebinar && (
               <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-white/5 text-white/40 border border-white/10">
                 <div className="w-3 h-3 rounded-full border border-white/30 border-t-white/60 animate-spin" />
-                يُولَّد التصميم…
+                Generating…
               </span>
             )}
           </div>
@@ -1053,7 +1141,7 @@ export default function MarsadCards() {
           {activeTab === 'webinar' && aiWebinarImage ? (
             <img
               src={aiWebinarImage}
-              alt="تصميم AI للندوة"
+              alt="AI Webinar Design"
               className="rounded-2xl shadow-2xl"
               style={{
                 maxHeight: 'calc(100vh - 160px)', maxWidth: '100%', width: 'auto', objectFit: 'contain',
@@ -1072,14 +1160,14 @@ export default function MarsadCards() {
             >
               <div className="flex flex-col items-center gap-4 text-purple-300">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-[#a855f7]" />
-                <p className="text-sm font-medium">يُصمِّم GPT Image…</p>
-                <p className="text-xs text-purple-400/60">قد يستغرق دقيقة</p>
+                <p className="text-sm font-medium">GPT Image designing…</p>
+                <p className="text-xs text-purple-400/60">May take up to a minute</p>
               </div>
             </div>
           ) : cardDataUrl ? (
             <img
               src={cardDataUrl}
-              alt="معاينة البطاقة"
+              alt="Card Preview"
               className="rounded-2xl shadow-2xl border border-white/10"
               style={{ maxHeight: 'calc(100vh - 160px)', maxWidth: '100%', width: 'auto', objectFit: 'contain' }}
             />
@@ -1090,18 +1178,121 @@ export default function MarsadCards() {
             >
               <div className="flex flex-col items-center gap-3 text-white/30">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#C9A84C]" />
-                <p className="text-sm">جارٍ توليد البطاقة…</p>
+                <p className="text-sm">Rendering card…</p>
               </div>
             </div>
           )}
 
           <p className="mt-4 text-xs text-white/20 text-center max-w-[300px]">
             {activeTab === 'webinar' && aiWebinarImage
-              ? 'تصميم ذكاء اصطناعي — انقر على "إلغاء التصميم AI" للعودة للبطاقة الافتراضية'
-              : 'البطاقة تُحدَّث تلقائياً عند تغيير البيانات'}
+              ? "AI design active — click 'Cancel AI Design' to revert"
+              : 'Card updates automatically as you edit'}
           </p>
         </div>
       </div>
+
+      {/* ── Metricool Modal ──────────────────────────────────────────────────── */}
+      {metricoolOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setMetricoolOpen(false)}>
+          <div className="glass rounded-2xl w-full max-w-md p-8 space-y-6 border border-purple-500/20 shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Radio size={20} className="text-purple-400" />
+                <h3 className="font-bold text-lg tracking-tight">Send to Metricool</h3>
+              </div>
+              <button onClick={() => setMetricoolOpen(false)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {mcLoading && !mcBrands.length ? (
+              <div className="flex items-center justify-center py-10 gap-3 text-white/40">
+                <Loader2 className="animate-spin" size={20} />
+                <span className="text-sm uppercase tracking-widest">Connecting to Metricool…</span>
+              </div>
+            ) : mcSuccess ? (
+              <div className="py-10 text-center space-y-4">
+                <div className="text-4xl">✓</div>
+                <p className="font-bold text-green-400 uppercase tracking-widest text-sm">Post Sent Successfully!</p>
+                <p className="text-white/40 text-xs">Check your Metricool planner dashboard to confirm.</p>
+                <button onClick={() => { setMetricoolOpen(false); setMcSuccess(false); }} className="btn-primary px-8">Done</button>
+              </div>
+            ) : (
+              <>
+                {mcBrands.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-white/40">Brand</label>
+                    <select value={mcSelectedBrand?.id ?? ''}
+                      onChange={e => { const b = mcBrands.find(b => String(b.id) === e.target.value); if (b) handleBrandChange(b); }}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-purple-500">
+                      {mcBrands.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {mcSelectedBrand && (() => {
+                  const nets = getConnectedNetworks(mcSelectedBrand);
+                  return nets.length > 0 ? (
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest text-white/40">Networks</label>
+                      <div className="flex flex-wrap gap-2">
+                        {nets.map(({ key, label, handle }) => {
+                          const selected = mcSelectedNetworks.includes(key);
+                          return (
+                            <button key={key} onClick={() => toggleNetwork(key)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selected ? 'bg-purple-500/30 border-purple-500/60 text-purple-300' : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'}`}>
+                              {label}<span className="ml-1.5 font-normal opacity-60">@{handle}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-white/40">Caption Preview</label>
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-xs text-white/60 leading-relaxed max-h-24 overflow-y-auto" dir="ltr">
+                    {activeTab === 'signal'
+                      ? `${signal.pair} ${signal.direction} | Entry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit} | R:R ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}`
+                      : activeTab === 'calendar'
+                      ? `Economic Calendar — ${calendar.date}`
+                      : activeTab === 'proof-of-trades'
+                      ? `Proof of Trades — ${pot.period} | Total: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit}$`
+                      : `${webinar.title}\n${webinar.dateAr} | ${webinar.timeAr}`
+                    }
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-white/40">
+                    Schedule Date &amp; Time <span className="text-white/20">(leave blank to post now)</span>
+                  </label>
+                  <input type="datetime-local" value={mcScheduledAt} onChange={e => setMcScheduledAt(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-purple-500" />
+                </div>
+
+                {mcError && (
+                  <div className="p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-red-400 text-xs flex items-center gap-2">
+                    <AlertCircle size={14} /><span>{mcError}</span>
+                  </div>
+                )}
+
+                <button onClick={handleMetricoolSend}
+                  disabled={mcLoading || mcSelectedNetworks.length === 0}
+                  className="w-full py-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  {mcLoading
+                    ? <><Loader2 className="animate-spin" size={16} /> Sending…</>
+                    : <><Radio size={16} /> {mcScheduledAt ? 'Schedule Post' : 'Post Now'}</>
+                  }
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Off-screen canvas ── renders at full resolution, invisible to user ── */}
       <div
