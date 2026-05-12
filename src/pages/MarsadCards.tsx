@@ -80,13 +80,19 @@ export default function MarsadCards() {
   // New tag input
   const [newTag, setNewTag] = useState('');
 
-  // ── Load brand settings (for logo) ───────────────────────────────────────
+  // ── Load brand settings ── fetch both Marsad and IST Markets; use IST logo
+  // as fallback when Marsad brand settings haven't been configured yet
   useEffect(() => {
-    fetchWithAuth(`/api/settings/${activeBrand.settingsKey}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.value) setBrandSettings(d.value); })
-      .catch(() => {});
-  }, [activeBrand.settingsKey]);
+    Promise.all([
+      fetchWithAuth('/api/settings/brand-marsad-alsouq').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetchWithAuth('/api/settings/brand-ist-markets').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([marsad, ist]) => {
+      const m = (marsad?.value) || {};
+      const i = (ist?.value)    || {};
+      // Marsad settings override IST; IST logo fills in if Marsad logo is missing
+      setBrandSettings({ logoUrl: i.logoUrl || '', ...m });
+    });
+  }, []);
 
   // ── Auto-compute R:R when signal prices change ────────────────────────────
   useEffect(() => {
@@ -192,9 +198,8 @@ export default function MarsadCards() {
     : activeTab === 'proof-of-trades' ? pot
     : webinar;
 
-  // ── Preview scale ─────────────────────────────────────────────────────────
+  // Loading placeholder dimensions
   const PREVIEW_W = 360;
-  const scale = PREVIEW_W / 1080;
 
   const accent = activeBrand.accentColor;
 
@@ -676,49 +681,60 @@ export default function MarsadCards() {
         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-8 px-4 bg-[#060606]">
           <div className="mb-4 text-xs text-white/25 font-mono tracking-wide">معاينة البطاقة • 1080 × 1620</div>
 
-          {/* Scaled canvas wrapper */}
-          <div
-            className="relative shadow-2xl rounded-xl overflow-hidden"
-            style={{
-              width:  PREVIEW_W,
-              height: Math.round(PREVIEW_W * (1620 / 1080)),
-            }}
-          >
+          {cardDataUrl ? (
+            <img
+              src={cardDataUrl}
+              alt="معاينة البطاقة"
+              className="rounded-2xl shadow-2xl border border-white/10"
+              style={{ maxHeight: 'calc(100vh - 160px)', maxWidth: '100%', width: 'auto', objectFit: 'contain' }}
+            />
+          ) : (
             <div
-              style={{
-                transformOrigin: 'top left',
-                transform: `scale(${scale})`,
-                width: 1080,
-                height: 1620,
-              }}
+              className="flex items-center justify-center rounded-2xl bg-[#0D1B2A] border border-white/10"
+              style={{ width: PREVIEW_W, height: Math.round(PREVIEW_W * (1620 / 1080)) }}
             >
-              <BrandedCanvas
-                backgroundImage={null}
-                storyImage={null}
-                headline=""
-                accentColor={activeBrand.accentColor}
-                logoUrl={brandSettings?.logoUrl || ''}
-                tagline=""
-                disclaimer=""
-                language="ar"
-                width={1080}
-                height={1620}
-                brandId="marsad-alsouq"
-                cardType={activeTab}
-                cardData={
-                  activeTab === 'calendar'
-                    ? { ...calendar, events: calendar.events.filter(e => !(e as any)._hidden) }
-                    : currentCardData
-                }
-                onExport={setCardDataUrl}
-              />
+              <div className="flex flex-col items-center gap-3 text-white/30">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#C9A84C]" />
+                <p className="text-sm">جارٍ توليد البطاقة…</p>
+              </div>
             </div>
-          </div>
+          )}
 
           <p className="mt-4 text-xs text-white/20 text-center max-w-[300px]">
             البطاقة تُحدَّث تلقائياً عند تغيير البيانات
           </p>
         </div>
+      </div>
+
+      {/* ── Off-screen canvas ── renders at full resolution, invisible to user ── */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed', left: '-9999px', top: '-9999px',
+          width: 1080, height: 1620,
+          opacity: 0, pointerEvents: 'none', zIndex: -1,
+        }}
+      >
+        <BrandedCanvas
+          backgroundImage={null}
+          storyImage={null}
+          headline=""
+          accentColor={activeBrand.accentColor}
+          logoUrl={brandSettings?.logoUrl || ''}
+          tagline=""
+          disclaimer=""
+          language="ar"
+          width={1080}
+          height={1620}
+          brandId="marsad-alsouq"
+          cardType={activeTab}
+          cardData={
+            activeTab === 'calendar'
+              ? { ...calendar, events: calendar.events.filter(e => !(e as any)._hidden) }
+              : currentCardData
+          }
+          onExport={setCardDataUrl}
+        />
       </div>
     </div>
   );

@@ -623,12 +623,27 @@ async function renderMarsadProofOfTrades(
     drawCenteredPill(ctx, data.period, cx, cardY + 282, '#0A1628', GOLD, GOLD, 22, 44, 22, 24);
   }
 
-  // ── Screenshot zone (y = 315 → 575) ─────────────────────────────────────
-  const ssX = cardX + PAD;
-  const ssY = cardY + 310;
-  const ssW = cardW - PAD * 2;
-  const ssH = 265;
+  // ── Dynamic layout: work backwards from footer so screenshot fills space ──
+  // This ensures the MT5 screenshot is tall when few trades are present.
+  const tradesSlice = data.trades.slice(0, 7);
+  const tHdrH       = 52;
+  const rowH        = 80;
+  const totalH      = 72;
+  // footerY matches drawMarsadFooter constant: cardY + cardH - 145
+  const footerStartY = cardY + cardH - 145;
+  const totalY       = footerStartY - 20 - totalH;
+  const tHdrY        = totalY - 6 - tradesSlice.length * rowH - tHdrH;
+  const sepY         = tHdrY - 16;
 
+  const ssX  = cardX + PAD;
+  const ssY  = cardY + 310;
+  const ssW  = cardW - PAD * 2;
+  const ssH  = Math.max(220, sepY - 22 - ssY);
+
+  const tableX = cardX + PAD;
+  const tableW = cardW - PAD * 2;
+
+  // ── Screenshot zone ───────────────────────────────────────────────────────
   if (data.screenshotImage) {
     ctx.save();
     roundedRectPath(ctx, ssX, ssY, ssW, ssH, 10);
@@ -655,9 +670,6 @@ async function renderMarsadProofOfTrades(
   ctx.strokeStyle = GOLD + '25'; ctx.lineWidth = 1; ctx.stroke();
 
   // ── Separator ─────────────────────────────────────────────────────────────
-  const sepY = ssY + ssH + 22;
-
-  // Gold gradient line
   const goldLineGrad = ctx.createLinearGradient(ssX, 0, ssX + ssW, 0);
   goldLineGrad.addColorStop(0,   GOLD + '00');
   goldLineGrad.addColorStop(0.5, GOLD + '90');
@@ -666,12 +678,6 @@ async function renderMarsadProofOfTrades(
   ctx.beginPath(); ctx.moveTo(ssX, sepY); ctx.lineTo(ssX + ssW, sepY); ctx.stroke();
 
   // ── Trade table ───────────────────────────────────────────────────────────
-  const tableX  = cardX + PAD;
-  const tableW  = cardW - PAD * 2;
-  const tHdrY   = sepY + 16;
-  const tHdrH   = 52;
-  const rowH    = 80;
-  const maxRows = 7;
 
   const colW2 = { symbol: 150, dir: 90, lots: 80, entry: 130, close: 130, profit: tableW - 150 - 90 - 80 - 130 - 130 };
   const col2 = {
@@ -703,7 +709,7 @@ async function renderMarsadProofOfTrades(
   drawGoldRule(ctx, cardX, tHdrY + tHdrH, cardW, 0.15);
 
   // Trade rows
-  const trades = data.trades.slice(0, maxRows);
+  const trades = tradesSlice;
   trades.forEach((t: TradeEntry, i: number) => {
     const ry = tHdrY + tHdrH + i * rowH;
     ctx.fillStyle = i % 2 === 0 ? '#0A1628' : '#0D1A2E';
@@ -747,8 +753,7 @@ async function renderMarsadProofOfTrades(
   });
 
   // ── Total row ─────────────────────────────────────────────────────────────
-  const totalY = tHdrY + tHdrH + trades.length * rowH + 6;
-  const totalH = 72;
+  // totalY / totalH are pre-calculated above in the dynamic layout section
 
   const totalGrad = ctx.createLinearGradient(tableX, 0, tableX + tableW, 0);
   totalGrad.addColorStop(0,   '#0F2018');
