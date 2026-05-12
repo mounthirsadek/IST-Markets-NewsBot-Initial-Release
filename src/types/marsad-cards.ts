@@ -62,4 +62,5 @@ export interface WebinarData {
   qrDataUrl?: string;     // base64 QR image (fetched from /api/marsad/qrcode)
   tags?: string[];        // ["مجاني", "تحليل فني"]
   hostName?: string;      // presenter name
+  presenterImage?: string; // base64 data URL — uploaded presenter photo for AI card generation
 }

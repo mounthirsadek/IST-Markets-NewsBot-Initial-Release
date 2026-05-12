@@ -11,7 +11,7 @@ const authenticator = (otplib as any).default?.authenticator || (otplib as any).
 import QRCode from 'qrcode';
 import { createHash, randomUUID } from 'crypto';
 import { GoogleGenAI, Type } from "@google/genai";
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -1281,55 +1281,118 @@ async function startServer() {
     }
   });
 
-  // Economic Calendar — proxies FMP API for a given date
+  // Economic Calendar — tries FMP first, falls back to Forex Factory JSON
   app.get('/api/marsad/economic-calendar', checkAuth, async (req: any, res: any) => {
-    try {
-      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
-      const apiKey = process.env.FMP_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: 'FMP_API_KEY not configured' });
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
 
-      const url = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${date}&to=${date}&apikey=${apiKey}`;
-      const response = await axios.get(url);
-      const raw = Array.isArray(response.data) ? response.data : [];
-
-      const events = raw.map((e: any) => {
-        // FMP time field: "2024-01-15 14:30:00" or just "14:30"
+    // Helper: normalise a raw array of FMP events
+    function normaliseFMP(raw: any[]): any[] {
+      return raw.map((e: any) => {
         const rawTime: string = e.time || e.date || '';
         const time = rawTime.includes('T')
           ? rawTime.split('T')[1]?.slice(0, 5) || ''
           : rawTime.includes(' ')
             ? rawTime.split(' ')[1]?.slice(0, 5) || ''
             : rawTime.slice(0, 5);
-
         const actual   = e.actual   != null && e.actual   !== '' ? String(e.actual)   : undefined;
         const forecast = e.estimate != null && e.estimate !== '' ? String(e.estimate) : undefined;
         const previous = e.previous != null && e.previous !== '' ? String(e.previous) : undefined;
-
-        // Derive beat/miss/neutral
         let result: 'beat' | 'miss' | 'neutral' = 'neutral';
         if (actual !== undefined && forecast !== undefined) {
           const a = parseFloat(actual), f = parseFloat(forecast);
           if (!isNaN(a) && !isNaN(f)) result = a > f ? 'beat' : a < f ? 'miss' : 'neutral';
         }
+        return { time, country: e.country || '', event: e.event || '', actual, forecast, previous, impact: ((e.impact || 'Low') as string).toLowerCase() as 'high'|'medium'|'low', result };
+      }).sort((a: any, b: any) => a.time.localeCompare(b.time));
+    }
 
-        return {
-          time,
-          country: e.country || '',
-          event:   e.event   || '',
-          actual,
-          forecast,
-          previous,
-          impact: ((e.impact || 'Low') as string).toLowerCase() as 'high' | 'medium' | 'low',
-          result,
-        };
-      });
+    // Helper: normalise Forex Factory JSON events
+    function normaliseFF(raw: any[], targetDate: string): any[] {
+      return raw
+        .filter((e: any) => {
+          if (!e.date) return false;
+          // FF dates: "01-13-2025T00:00:00-0500" or ISO
+          const evDay = new Date(e.date).toISOString().slice(0, 10);
+          return evDay === targetDate;
+        })
+        .filter((e: any) => !['Holiday', 'Non-Economic'].includes(e.impact))
+        .map((e: any) => {
+          // Convert "8:15am" / "2:30pm" → "08:15"
+          let time = '00:00';
+          const ts: string = (e.time || '').trim();
+          if (ts && ts !== 'All Day' && ts !== 'Tentative') {
+            const m = ts.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+            if (m) {
+              let h = parseInt(m[1]);
+              const min = m[2];
+              if (m[3].toLowerCase() === 'pm' && h !== 12) h += 12;
+              if (m[3].toLowerCase() === 'am' && h === 12) h = 0;
+              time = `${String(h).padStart(2, '0')}:${min}`;
+            }
+          }
+          const actual   = e.actual   && e.actual   !== '' ? e.actual   : undefined;
+          const forecast = e.forecast && e.forecast !== '' ? e.forecast : undefined;
+          const previous = e.previous && e.previous !== '' ? e.previous : undefined;
+          let result: 'beat' | 'miss' | 'neutral' = 'neutral';
+          if (actual && forecast) {
+            const a = parseFloat(actual.replace(/[^0-9.\-]/g, ''));
+            const f = parseFloat(forecast.replace(/[^0-9.\-]/g, ''));
+            if (!isNaN(a) && !isNaN(f)) result = a > f ? 'beat' : a < f ? 'miss' : 'neutral';
+          }
+          const impactMap: Record<string, 'high'|'medium'|'low'> = { High: 'high', Medium: 'medium', Low: 'low' };
+          return {
+            time,
+            country: (e.country || 'USD').replace(/USD/g,'US').replace(/EUR/g,'EU').replace(/GBP/g,'GB').replace(/JPY/g,'JP').replace(/AUD/g,'AU').replace(/CAD/g,'CA').replace(/CHF/g,'CH').replace(/CNY/g,'CN').replace(/NZD/g,'NZ'),
+            event: e.title || '',
+            actual, forecast, previous,
+            impact: impactMap[e.impact] || 'low',
+            result,
+          };
+        })
+        .sort((a: any, b: any) => a.time.localeCompare(b.time));
+    }
 
-      // Sort chronologically
-      events.sort((a: any, b: any) => a.time.localeCompare(b.time));
-      res.json(events);
-    } catch (e: any) {
-      console.error('[MarsadCalendar] Error:', e.message);
-      res.status(500).json({ error: e.message });
+    // ── 1. Try FMP ───────────────────────────────────────────────────────────
+    const apiKey = process.env.FMP_API_KEY;
+    if (apiKey) {
+      try {
+        const fmpUrl = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${date}&to=${date}&apikey=${apiKey}`;
+        const fmpRes = await axios.get(fmpUrl, { timeout: 8000 });
+        const events = normaliseFMP(Array.isArray(fmpRes.data) ? fmpRes.data : []);
+        console.log(`[Calendar] FMP returned ${events.length} events for ${date}`);
+        return res.json(events);
+      } catch (fmpErr: any) {
+        const status = fmpErr.response?.status;
+        console.warn(`[Calendar] FMP failed (${status || fmpErr.message}) — falling back to Forex Factory`);
+      }
+    }
+
+    // ── 2. Fallback: Forex Factory free JSON ─────────────────────────────────
+    try {
+      const targetDate = new Date(date);
+      const now = new Date();
+      const diffDays = Math.round((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Try current-week first; if date is >3 days ahead, also try next-week
+      const urls = diffDays > 3
+        ? ['https://nfs.faireconomy.media/ff_calendar_nextweek.json', 'https://nfs.faireconomy.media/ff_calendar_thisweek.json']
+        : ['https://nfs.faireconomy.media/ff_calendar_thisweek.json', 'https://nfs.faireconomy.media/ff_calendar_nextweek.json'];
+
+      let ffEvents: any[] = [];
+      for (const ffUrl of urls) {
+        try {
+          const ffRes = await axios.get(ffUrl, { timeout: 8000 });
+          const raw = Array.isArray(ffRes.data) ? ffRes.data : [];
+          ffEvents = normaliseFF(raw, date);
+          if (ffEvents.length > 0) break;
+        } catch { /* try next URL */ }
+      }
+
+      console.log(`[Calendar] ForexFactory returned ${ffEvents.length} events for ${date}`);
+      res.json(ffEvents);
+    } catch (ffErr: any) {
+      console.error('[Calendar] Both sources failed:', ffErr.message);
+      res.status(503).json({ error: 'تعذّر جلب البيانات من المصادر المتاحة. يرجى المحاولة لاحقاً أو إدخال الأحداث يدوياً.' });
     }
   });
 
@@ -1345,6 +1408,167 @@ async function startServer() {
       });
       res.json({ dataUrl });
     } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── MT5 Proof-of-Trades screenshot analysis — Gemini Vision ─────────────────
+  app.post('/api/marsad/analyze-pot', checkAuth, async (req: any, res: any) => {
+    try {
+      const { imageBase64 } = req.body;
+      if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+      const dataMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!dataMatch) return res.status(400).json({ error: 'Invalid image format — expected data:mime;base64,...' });
+      const mimeType  = dataMatch[1];
+      const base64Data = dataMatch[2];
+
+      const potSchema = {
+        type: Type.OBJECT,
+        properties: {
+          period: { type: Type.STRING, description: 'Period / date range visible on screenshot e.g. "أبريل 2025" or "April 2025"' },
+          trades: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                symbol:     { type: Type.STRING,  description: 'Trading symbol e.g. XAUUSD, EURUSD' },
+                direction:  { type: Type.STRING,  description: 'BUY or SELL' },
+                lots:       { type: Type.NUMBER,  description: 'Trade volume / lots' },
+                entryPrice: { type: Type.NUMBER,  description: 'Open/entry price' },
+                closePrice: { type: Type.NUMBER,  description: 'Close price' },
+                profit:     { type: Type.NUMBER,  description: 'Profit or loss in account currency (negative for loss)' },
+              },
+              required: ['symbol', 'direction', 'lots', 'entryPrice', 'closePrice', 'profit'],
+            },
+          },
+          confidence: { type: Type.STRING, description: 'high | medium | low — how clearly the data was read' },
+        },
+        required: ['period', 'trades', 'confidence'],
+      };
+
+      const prompt = `أنت خبير في منصات تداول MetaTrader 4 و MetaTrader 5. قم بتحليل لقطة الشاشة هذه بعناية تامة واستخرج:
+
+1. الفترة الزمنية للصفقات (شهر وسنة، أو أي تواريخ مرئية)
+2. لكل صفقة مُغلقة في الجدول:
+   - رمز الأصل (Symbol) — مثل XAUUSD، EURUSD، BTCUSD
+   - الاتجاه: BUY أو SELL (استخدم buy/sell/long/short المرئي في الصورة)
+   - الحجم (Volume/Lots) — الرقم العشري
+   - سعر الدخول (Open Price)
+   - سعر الإغلاق (Close Price)
+   - الربح أو الخسارة (Profit/Loss) — بالعملة، سالب للخسارة
+
+استخرج جميع الصفقات المرئية. إذا لم تتمكن من قراءة قيمة، استخدم 0. أعطِ مستوى الثقة: high إذا كانت البيانات واضحة، medium إذا كانت بعضها غير واضح، low إذا كانت الصورة منخفضة الجودة.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ parts: [
+          { inlineData: { mimeType, data: base64Data } },
+          { text: prompt },
+        ]}],
+        config: { responseMimeType: 'application/json', responseSchema: potSchema },
+      });
+
+      const result = JSON.parse(response.text || '{}');
+      await logAction(req.user.id, 'ANALYZE_POT', 'marsad-card', null, `trades=${result.trades?.length ?? 0}`);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[AnalyzePOT] Error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Webinar AI image generation — gpt-image-1 with brand identity ────────────
+  app.post('/api/marsad/generate-webinar', checkAuth, async (req: any, res: any) => {
+    try {
+      const { title, subtitle, dateAr, timeAr, platform, hostName, tags, presenterImageBase64 } = req.body;
+      if (!title) return res.status(400).json({ error: 'title is required' });
+
+      const tagsList = Array.isArray(tags) && tags.length > 0 ? tags.join('، ') : '';
+      const hasPresenter = !!(presenterImageBase64 && presenterImageBase64.startsWith('data:'));
+
+      const brandPrompt = `You are a world-class graphic designer creating a premium Arabic financial webinar announcement poster for "Marsad Al Souq" (مرصد السوق) — an elite Middle-Eastern financial markets analysis brand by IST Markets.
+
+STRICT DESIGN SPECIFICATIONS:
+- Canvas size: portrait 2:3 aspect ratio
+- Background: rich deep dark-navy gradient (#0D1B2A at top → #070E1A at bottom), very dark, elegant
+- Primary accent: warm antique gold (#C9A84C) for all borders, decorative lines, icons, highlights
+- Text colors: gold for brand name/headers, pure white for main content, dimmed gray for secondary text
+- Overall feel: luxury dark financial brand — think Bloomberg Terminal meets Arabic elegance. NO cartoon, NO flat design, NO bright backgrounds.
+
+MANDATORY LAYOUT (top → bottom):
+① HEADER ZONE (~10% height):
+  • Small gold circular crosshair / scope / targeting reticle SVG icon on the RIGHT
+  • Immediately LEFT of that icon: Arabic text "مرصد السوق" in gold bold serif
+  • Thin gold gradient separator line spanning full width below the header text
+  • Below separator on LEFT: small gray text "Marsad Al Souq — Financial Markets Intelligence"
+
+② CONTENT ZONE (~70% height):
+  • Centered gold pill badge: "🎙 ندوة مباشرة" (micro size, rounded, gold border)
+${hasPresenter ? '  • Prominent circular presenter portrait (centered, ~200px diameter) with a double gold ring border — faithfully reproduce the face from the provided reference photo\n' : ''}  • MAIN TITLE in LARGE white Arabic bold text (centered, 2-3 lines, Cairo or similar Arabic font): "${title}"
+${subtitle ? `  • SUBTITLE smaller text (centered, dimmed white 60%): "${subtitle}"` : ''}
+  • Decorative thin gold rule
+  • Two elegant pill badges centered:
+    - Calendar icon + "${dateAr}"
+    - Clock icon + "${timeAr}"
+  • Smaller pill: "${platform}" in matching brand color
+${hostName ? `  • Host name line: "يقدمها: ${hostName}" in small gold italic text` : ''}
+${tagsList ? `  • Row of small dark tag pills: ${tagsList}` : ''}
+  • Centered QR code block (gold QR pattern on very dark navy square, ~180×180 px, with "امسح للتسجيل" label in gold below)
+
+③ FOOTER (~10% height):
+  • Full-width thin gold line
+  • Centered: small "بدعم من IST Markets" in gray/dimmed text
+  • Subtle gold corner decorative accents on card
+
+BACKGROUND DECORATION:
+  • Very subtle gold dot-matrix pattern at 4% opacity over dark navy
+  • Soft radial gold glow at top-right corner (15% opacity)
+  • Dark angular shapes at bottom-left for depth
+
+TYPOGRAPHY STYLE: Modern elegant, mix of Arabic and Latin, clean spacing, RTL Arabic text layout throughout.
+Output a complete, publication-ready poster at the highest quality with all elements visible and properly positioned.`;
+
+      let b64Image: string | null = null;
+
+      if (hasPresenter) {
+        // images.edit — incorporate the presenter's real photo
+        const mimeMatch = presenterImageBase64.match(/^data:([^;]+);base64,(.+)$/);
+        if (!mimeMatch) return res.status(400).json({ error: 'Invalid presenter image format' });
+        const mimeType  = mimeMatch[1];
+        const rawBase64 = mimeMatch[2];
+        const buffer    = Buffer.from(rawBase64, 'base64');
+        const ext       = mimeType.split('/')[1]?.split(';')[0] || 'png';
+
+        const imageFile = await toFile(buffer, `presenter.${ext}`, { type: mimeType });
+
+        const editRes = await (openai.images as any).edit({
+          model: 'gpt-image-1',
+          image: imageFile,
+          prompt: brandPrompt,
+          size: '1024x1536',
+          quality: 'high',
+          n: 1,
+        });
+        b64Image = editRes.data?.[0]?.b64_json ?? null;
+      } else {
+        // Pure text-to-image generation
+        const genRes = await (openai.images as any).generate({
+          model: 'gpt-image-1',
+          prompt: brandPrompt,
+          size: '1024x1536',
+          quality: 'high',
+          n: 1,
+        });
+        b64Image = genRes.data?.[0]?.b64_json ?? null;
+      }
+
+      if (!b64Image) return res.status(500).json({ error: 'لم يُولَّد أي تصميم — حاول مرة أخرى' });
+
+      await logAction(req.user.id, 'GENERATE_WEBINAR_AI', 'marsad-card', null, `title=${title.slice(0, 40)}`);
+      res.json({ dataUrl: `data:image/png;base64,${b64Image}` });
+    } catch (e: any) {
+      console.error('[WebinarAI] Error:', e.message);
       res.status(500).json({ error: e.message });
     }
   });

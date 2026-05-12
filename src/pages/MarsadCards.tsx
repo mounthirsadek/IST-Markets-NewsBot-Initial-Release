@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight, Sparkles } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight, Sparkles, User, ImageIcon, X } from 'lucide-react';
 import { useBrandStore } from '../context/BrandContext';
 import { fetchWithAuth } from '../lib/api';
 import BrandedCanvas from '../components/BrandedCanvas';
@@ -77,8 +77,14 @@ export default function MarsadCards() {
   const [calLoading, setCalLoading] = useState(false);
   // Webinar QR
   const [qrLoading, setQrLoading] = useState(false);
-  // AI chart analysis
+  // AI chart analysis (Signal tab)
   const [analyzing, setAnalyzing] = useState(false);
+  // AI POT analysis
+  const [analyzingPOT, setAnalyzingPOT] = useState(false);
+  // AI Webinar generation (gpt-image-1)
+  const [generatingWebinar, setGeneratingWebinar] = useState(false);
+  // AI-generated webinar image (bypasses canvas when set)
+  const [aiWebinarImage, setAiWebinarImage] = useState<string>('');
   // New tag input
   const [newTag, setNewTag] = useState('');
 
@@ -157,6 +163,72 @@ export default function MarsadCards() {
     }
   }, [showToast]);
 
+  // ── Analyse MT5 screenshot → auto-fill POT trades ────────────────────────
+  const handleAnalyzePOT = useCallback(async (imageBase64: string) => {
+    setAnalyzingPOT(true);
+    try {
+      const res = await fetchWithAuth('/api/marsad/analyze-pot', {
+        method: 'POST',
+        body: JSON.stringify({ imageBase64 }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json();
+
+      // Build trade entries from AI response, keeping existing UI ids
+      const newTrades = (data.trades || []).map((t: any) => ({
+        id: Math.random().toString(36).slice(2),
+        symbol:     (t.symbol     || 'XAUUSD').toUpperCase(),
+        direction:  (t.direction === 'SELL' || t.direction?.toLowerCase() === 'sell') ? 'SELL' : 'BUY',
+        lots:       Number(t.lots)       || 0.1,
+        entryPrice: Number(t.entryPrice) || 0,
+        closePrice: Number(t.closePrice) || 0,
+        profit:     Number(t.profit)     || 0,
+      }));
+
+      setPot(prev => ({
+        ...prev,
+        period: data.period || prev.period,
+        trades: newTrades.length > 0 ? newTrades : prev.trades,
+      }));
+
+      const conf = data.confidence === 'high' ? 'عالية ✓' : data.confidence === 'medium' ? 'متوسطة' : 'منخفضة';
+      showToast('success', `تم تحليل ${newTrades.length} صفقة — ثقة: ${conf}`);
+    } catch (e: any) {
+      showToast('error', 'فشل التحليل: ' + e.message);
+    } finally {
+      setAnalyzingPOT(false);
+    }
+  }, [showToast]);
+
+  // ── Generate Webinar card using gpt-image-1 ───────────────────────────────
+  const handleGenerateWebinar = useCallback(async () => {
+    if (!webinar.title.trim()) return showToast('error', 'أدخل عنوان الندوة أولاً');
+    setGeneratingWebinar(true);
+    try {
+      const res = await fetchWithAuth('/api/marsad/generate-webinar', {
+        method: 'POST',
+        body: JSON.stringify({
+          title:               webinar.title,
+          subtitle:            webinar.subtitle,
+          dateAr:              webinar.dateAr,
+          timeAr:              webinar.timeAr,
+          platform:            webinar.platform,
+          hostName:            webinar.hostName,
+          tags:                webinar.tags,
+          presenterImageBase64: webinar.presenterImage,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const { dataUrl } = await res.json();
+      setAiWebinarImage(dataUrl);
+      showToast('success', 'تم توليد التصميم بالذكاء الاصطناعي ✨');
+    } catch (e: any) {
+      showToast('error', 'فشل توليد التصميم: ' + e.message);
+    } finally {
+      setGeneratingWebinar(false);
+    }
+  }, [webinar, showToast]);
+
   // ── Fetch QR code when booking URL changes ───────────────────────────────
   useEffect(() => {
     if (!webinar.bookingUrl || !webinar.bookingUrl.startsWith('http')) {
@@ -176,22 +248,25 @@ export default function MarsadCards() {
     return () => clearTimeout(timeout);
   }, [webinar.bookingUrl]);
 
+  // ── Active image URL: AI-generated wins over canvas export ──────────────
+  const activeImageUrl = (activeTab === 'webinar' && aiWebinarImage) ? aiWebinarImage : cardDataUrl;
+
   // ── Download PNG ──────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
-    if (!cardDataUrl) return showToast('info', 'انتظر تحميل البطاقة…');
+    if (!activeImageUrl) return showToast('info', 'انتظر تحميل البطاقة…');
     const a = document.createElement('a');
-    a.href = cardDataUrl;
-    a.download = `marsad-${activeTab}-${Date.now()}.jpg`;
+    a.href = activeImageUrl;
+    a.download = `marsad-${activeTab}-${Date.now()}.png`;
     a.click();
-  }, [cardDataUrl, activeTab, showToast]);
+  }, [activeImageUrl, activeTab, showToast]);
 
   // ── Publish to Telegram ───────────────────────────────────────────────────
   const handlePublish = useCallback(async () => {
-    if (!cardDataUrl) return showToast('info', 'انتظر تحميل البطاقة…');
+    if (!activeImageUrl) return showToast('info', 'انتظر تحميل البطاقة…');
     setPublishing(true);
     try {
       // Convert data URL → blob → upload
-      const blob = await (await fetch(cardDataUrl)).blob();
+      const blob = await (await fetch(activeImageUrl)).blob();
       const form = new FormData();
       form.append('file', blob, `marsad-${activeTab}.jpg`);
 
@@ -261,7 +336,7 @@ export default function MarsadCards() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); if (tab.id !== 'webinar') setAiWebinarImage(''); }}
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
                 active ? 'border-current text-white' : 'border-transparent text-white/40 hover:text-white/70'
               }`}
@@ -528,12 +603,12 @@ export default function MarsadCards() {
                 />
               </div>
 
-              {/* Screenshot upload */}
+              {/* Screenshot upload + AI analysis */}
               <div>
                 <label className="block text-xs text-white/40 mb-2">لقطة شاشة MT5 (اختياري)</label>
                 <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-xl px-4 py-3 hover:border-[#10B981]/50 transition-colors">
                   <span className="text-sm text-white/40">
-                    {pot.screenshotImage ? 'تم رفع الصورة ✓' : 'اضغط لرفع لقطة الشاشة'}
+                    {pot.screenshotImage ? 'تم رفع الصورة ✓ — اضغط لتغييرها' : 'اضغط لرفع لقطة الشاشة'}
                   </span>
                   <input type="file" accept="image/*" className="hidden"
                     onChange={async e => {
@@ -541,6 +616,39 @@ export default function MarsadCards() {
                       if (f) { const b64 = await fileToBase64(f); setPot(p => ({ ...p, screenshotImage: b64 })); }
                     }} />
                 </label>
+
+                {/* AI analysis button — visible once screenshot is uploaded */}
+                {pot.screenshotImage && (
+                  <button
+                    onClick={() => pot.screenshotImage && handleAnalyzePOT(pot.screenshotImage)}
+                    disabled={analyzingPOT}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
+                    style={{
+                      background: 'linear-gradient(135deg, #052e16 0%, #065f46 100%)',
+                      border: '1px solid #10B98160',
+                      color: '#6ee7b7',
+                    }}
+                  >
+                    {analyzingPOT ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-[#6ee7b7] border-t-transparent animate-spin" />
+                        جارٍ استخراج الصفقات…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={15} />
+                        تحليل الشاشة وتعبئة الصفقات تلقائياً
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Thumbnail preview */}
+                {pot.screenshotImage && (
+                  <div className="mt-2 rounded-xl overflow-hidden border border-white/10" style={{ height: 70 }}>
+                    <img src={pot.screenshotImage} alt="mt5" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
 
               {/* Trade rows */}
@@ -730,6 +838,73 @@ export default function MarsadCards() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none"
                 />
               </div>
+
+              {/* Presenter photo upload */}
+              <div>
+                <label className="block text-xs text-white/40 mb-2">صورة المقدِّم (اختياري — لتصميم AI)</label>
+                <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-xl px-4 py-3 hover:border-[#A855F7]/50 transition-colors">
+                  <User size={15} className="text-white/30 shrink-0" />
+                  <span className="text-sm text-white/40">
+                    {webinar.presenterImage ? 'تم رفع الصورة ✓ — اضغط لتغييرها' : 'ارفع صورة المقدِّم للتصميم AI'}
+                  </span>
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      if (f) { const b64 = await fileToBase64(f); setWebinar(w => ({ ...w, presenterImage: b64 })); }
+                    }} />
+                </label>
+                {webinar.presenterImage && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <img src={webinar.presenterImage} alt="presenter" className="w-12 h-12 rounded-full object-cover border-2 border-[#A855F7]/50" />
+                    <button onClick={() => setWebinar(w => ({ ...w, presenterImage: undefined }))}
+                      className="text-xs text-white/30 hover:text-red-400 transition-colors flex items-center gap-1">
+                      <X size={12} /> إزالة الصورة
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Design button */}
+              <div className="pt-1">
+                <button
+                  onClick={handleGenerateWebinar}
+                  disabled={generatingWebinar || !webinar.title.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+                  style={{
+                    background: generatingWebinar
+                      ? 'linear-gradient(135deg, #2e1065 0%, #4c1d95 100%)'
+                      : 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 50%, #9333ea 100%)',
+                    border: '1px solid #a855f760',
+                    color: '#f3e8ff',
+                    boxShadow: generatingWebinar ? 'none' : '0 0 20px #7c3aed40',
+                  }}
+                >
+                  {generatingWebinar ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-[#f3e8ff] border-t-transparent animate-spin" />
+                      جارٍ التصميم بـ ChatGPT Image…
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon size={16} />
+                      تصميم احترافي بالذكاء الاصطناعي ✨
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-white/20 text-center mt-1">
+                  يستخدم GPT Image لإنشاء تصميم احترافي بهوية مرصد السوق
+                </p>
+
+                {/* Reset AI design */}
+                {aiWebinarImage && activeTab === 'webinar' && (
+                  <button
+                    onClick={() => setAiWebinarImage('')}
+                    className="mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs text-white/30 hover:text-red-400 border border-white/5 hover:border-red-400/20 transition-all"
+                  >
+                    <X size={11} /> إلغاء التصميم AI والعودة للبطاقة الافتراضية
+                  </button>
+                )}
+              </div>
             </>
           )}
 
@@ -751,9 +926,51 @@ export default function MarsadCards() {
 
         {/* ── Preview panel ───────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-8 px-4 bg-[#060606]">
-          <div className="mb-4 text-xs text-white/25 font-mono tracking-wide">معاينة البطاقة • 1080 × 1350</div>
+          {/* Header row: label + AI badge */}
+          <div className="mb-4 flex items-center gap-3">
+            <span className="text-xs text-white/25 font-mono tracking-wide">معاينة البطاقة • 1080 × 1350</span>
+            {activeTab === 'webinar' && aiWebinarImage && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                style={{ background: 'linear-gradient(90deg,#5b21b6,#9333ea)', color: '#f3e8ff' }}>
+                <Sparkles size={10} /> AI Design
+              </span>
+            )}
+            {activeTab === 'webinar' && generatingWebinar && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-white/5 text-white/40 border border-white/10">
+                <div className="w-3 h-3 rounded-full border border-white/30 border-t-white/60 animate-spin" />
+                يُولَّد التصميم…
+              </span>
+            )}
+          </div>
 
-          {cardDataUrl ? (
+          {/* Preview image */}
+          {activeTab === 'webinar' && aiWebinarImage ? (
+            <img
+              src={aiWebinarImage}
+              alt="تصميم AI للندوة"
+              className="rounded-2xl shadow-2xl"
+              style={{
+                maxHeight: 'calc(100vh - 160px)', maxWidth: '100%', width: 'auto', objectFit: 'contain',
+                border: '1px solid #7c3aed60',
+                boxShadow: '0 0 40px #7c3aed30',
+              }}
+            />
+          ) : activeTab === 'webinar' && generatingWebinar ? (
+            <div
+              className="flex items-center justify-center rounded-2xl border"
+              style={{
+                width: PREVIEW_W, height: Math.round(PREVIEW_W * (1350 / 1080)),
+                background: 'linear-gradient(180deg,#2e1065,#1e1035)',
+                borderColor: '#7c3aed40',
+              }}
+            >
+              <div className="flex flex-col items-center gap-4 text-purple-300">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-[#a855f7]" />
+                <p className="text-sm font-medium">يُصمِّم GPT Image…</p>
+                <p className="text-xs text-purple-400/60">قد يستغرق دقيقة</p>
+              </div>
+            </div>
+          ) : cardDataUrl ? (
             <img
               src={cardDataUrl}
               alt="معاينة البطاقة"
@@ -773,7 +990,9 @@ export default function MarsadCards() {
           )}
 
           <p className="mt-4 text-xs text-white/20 text-center max-w-[300px]">
-            البطاقة تُحدَّث تلقائياً عند تغيير البيانات
+            {activeTab === 'webinar' && aiWebinarImage
+              ? 'تصميم ذكاء اصطناعي — انقر على "إلغاء التصميم AI" للعودة للبطاقة الافتراضية'
+              : 'البطاقة تُحدَّث تلقائياً عند تغيير البيانات'}
           </p>
         </div>
       </div>
