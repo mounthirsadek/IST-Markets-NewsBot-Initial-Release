@@ -75,6 +75,9 @@ export default function MarsadCards() {
 
   // Calendar fetch
   const [calLoading, setCalLoading] = useState(false);
+  // AI calendar screenshot analysis
+  const [analyzingCalendar, setAnalyzingCalendar] = useState(false);
+  const [calendarScreenshot, setCalendarScreenshot] = useState<string>('');
   // Webinar QR
   const [qrLoading, setQrLoading] = useState(false);
   // AI chart analysis (Signal tab)
@@ -128,6 +131,42 @@ export default function MarsadCards() {
       setCalLoading(false);
     }
   }, [calendar.date, showToast]);
+
+  // ── Analyse calendar screenshot → auto-fill events ───────────────────────
+  const handleAnalyzeCalendar = useCallback(async (imageBase64: string) => {
+    setAnalyzingCalendar(true);
+    try {
+      const res = await fetchWithAuth('/api/marsad/analyze-calendar', {
+        method: 'POST',
+        body: JSON.stringify({ imageBase64 }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json();
+
+      const events: CalendarEvent[] = (data.events || []).map((e: any) => ({
+        time:     e.time     || '00:00',
+        country:  e.country  || '',
+        event:    e.event    || '',
+        actual:   e.actual   || undefined,
+        forecast: e.forecast || undefined,
+        previous: e.previous || undefined,
+        impact:   (['high','medium','low'].includes(e.impact)) ? e.impact : 'medium',
+        result:   e.result   || 'neutral',
+      }));
+
+      setCalendar(prev => ({
+        ...prev,
+        date:   data.date || prev.date,
+        events,
+      }));
+
+      showToast('success', `تم استخراج ${events.length} حدث من الصورة ✓`);
+    } catch (e: any) {
+      showToast('error', 'فشل التحليل: ' + e.message);
+    } finally {
+      setAnalyzingCalendar(false);
+    }
+  }, [showToast]);
 
   // ── Analyze chart image with Gemini Vision ───────────────────────────────
   const handleAnalyzeChart = useCallback(async (imageBase64: string) => {
@@ -527,28 +566,88 @@ export default function MarsadCards() {
           {/* ── CALENDAR FORM ─────────────────────────────────────────────── */}
           {activeTab === 'calendar' && (
             <>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-xs text-white/40 mb-2">التاريخ</label>
-                  <input type="date"
-                    value={calendar.date}
-                    onChange={e => setCalendar(c => ({ ...c, date: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2AABEE]"
-                  />
+              {/* ── Primary: Screenshot upload + AI extraction ─────────── */}
+              <div className="rounded-2xl border border-[#2AABEE]/25 bg-[#071828] p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Sparkles size={14} className="text-[#2AABEE]" />
+                  <span className="text-xs font-semibold text-[#2AABEE]">استخراج الأحداث من لقطة الشاشة</span>
                 </div>
-                <div className="flex items-end">
-                  <button onClick={fetchCalendar} disabled={calLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2AABEE]/20 border border-[#2AABEE]/40 text-[#2AABEE] rounded-xl text-sm font-medium hover:bg-[#2AABEE]/30 transition-colors disabled:opacity-50">
-                    <RefreshCw size={14} className={calLoading ? 'animate-spin' : ''} />
-                    {calLoading ? 'جارٍ الجلب…' : 'جلب البيانات'}
-                  </button>
-                </div>
+                <p className="text-[11px] text-white/35 leading-relaxed">
+                  التقط لقطة شاشة من أي موقع (Investing.com، Forex Factory…) ثم ارفعها — الذكاء الاصطناعي يستخرج جميع الأحداث تلقائياً.
+                </p>
+
+                {/* Upload zone */}
+                <label className="flex flex-col items-center gap-2 cursor-pointer rounded-xl border border-dashed border-[#2AABEE]/30 bg-white/3 py-3 hover:border-[#2AABEE]/60 hover:bg-[#2AABEE]/5 transition-all overflow-hidden">
+                  {calendarScreenshot ? (
+                    <img src={calendarScreenshot} alt="calendar screenshot" className="w-full rounded-lg object-contain max-h-28" />
+                  ) : (
+                    <>
+                      <Calendar size={24} className="text-[#2AABEE]/40" />
+                      <span className="text-sm text-white/35">اضغط لرفع لقطة الأجندة</span>
+                      <span className="text-[10px] text-white/20">PNG / JPG / WebP</span>
+                    </>
+                  )}
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      if (f) { const b64 = await fileToBase64(f); setCalendarScreenshot(b64); }
+                    }} />
+                </label>
+
+                {/* AI analyse button */}
+                <button
+                  onClick={() => calendarScreenshot && handleAnalyzeCalendar(calendarScreenshot)}
+                  disabled={!calendarScreenshot || analyzingCalendar}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: calendarScreenshot ? 'linear-gradient(135deg, #0c2a4a 0%, #1a4a6e 100%)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${calendarScreenshot ? '#2AABEE50' : 'rgba(255,255,255,0.08)'}`,
+                    color: calendarScreenshot ? '#7dd3fc' : 'rgba(255,255,255,0.25)',
+                    cursor: calendarScreenshot ? 'pointer' : 'not-allowed',
+                    opacity: analyzingCalendar ? 0.7 : 1,
+                  }}
+                >
+                  {analyzingCalendar ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-[#7dd3fc] border-t-transparent animate-spin" />
+                      جارٍ استخراج الأحداث…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={15} />
+                      استخراج الأحداث بالذكاء الاصطناعي
+                      {!calendarScreenshot && <span className="text-[10px] opacity-60 mr-1">(ارفع صورة أولاً)</span>}
+                    </>
+                  )}
+                </button>
               </div>
 
+              {/* ── Divider ─────────────────────────────────────────────── */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-white/8" />
+                <span className="text-[10px] text-white/25">أو جلب من API</span>
+                <div className="flex-1 h-px bg-white/8" />
+              </div>
+
+              {/* ── Fallback: API fetch ──────────────────────────────────── */}
+              <div className="flex gap-2">
+                <input type="date"
+                  value={calendar.date}
+                  onChange={e => setCalendar(c => ({ ...c, date: e.target.value }))}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2AABEE]"
+                />
+                <button onClick={fetchCalendar} disabled={calLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#2AABEE]/10 border border-[#2AABEE]/25 text-[#2AABEE]/70 rounded-xl text-sm font-medium hover:bg-[#2AABEE]/20 transition-colors disabled:opacity-50">
+                  <RefreshCw size={14} className={calLoading ? 'animate-spin' : ''} />
+                  {calLoading ? '…' : 'API'}
+                </button>
+              </div>
+
+              {/* ── Events list ─────────────────────────────────────────── */}
               {calendar.events.length > 0 && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-white/40">الأحداث ({calendar.events.length}) — اختر ما يُعرض</label>
+                    <label className="text-xs text-white/40">الأحداث ({calendar.events.length})</label>
                     <div className="flex gap-1">
                       {(['high','medium','low'] as const).map(imp => (
                         <button key={imp}
@@ -559,9 +658,13 @@ export default function MarsadCards() {
                           {imp === 'high' ? 'عالي' : imp === 'medium' ? 'متوسط' : 'منخفض'}
                         </button>
                       ))}
+                      <button onClick={() => { setCalendarScreenshot(''); setCalendar(c => ({ ...c, events: [] })); }}
+                        className="px-2 py-0.5 rounded text-[10px] text-white/25 hover:text-red-400 transition-colors">
+                        مسح ✕
+                      </button>
                     </div>
                   </div>
-                  <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                  <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
                     {calendar.events.map((ev, i) => (
                       <label key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 cursor-pointer hover:bg-white/8">
                         <input type="checkbox"
@@ -574,17 +677,17 @@ export default function MarsadCards() {
                         />
                         <span className={`w-2 h-2 rounded-full shrink-0 ${ev.impact === 'high' ? 'bg-red-500' : ev.impact === 'medium' ? 'bg-yellow-400' : 'bg-gray-500'}`} />
                         <span className="text-xs text-white/70 truncate flex-1">{ev.event}</span>
-                        <span className="text-[10px] text-white/30 font-mono">{ev.time}</span>
-                        <span className="text-[10px] text-white/30">{ev.country}</span>
+                        <span className="text-[10px] text-white/30 font-mono shrink-0">{ev.time}</span>
+                        <span className="text-[10px] text-white/30 shrink-0">{ev.country}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               )}
 
-              {calendar.events.length === 0 && (
-                <div className="text-center py-8 text-white/20 text-sm">
-                  اضغط "جلب البيانات" لتحميل أحداث اليوم
+              {calendar.events.length === 0 && !calendarScreenshot && (
+                <div className="text-center py-6 text-white/20 text-xs">
+                  ارفع لقطة شاشة أعلاه لاستخراج الأحداث تلقائياً
                 </div>
               )}
             </>

@@ -1442,6 +1442,75 @@ async function startServer() {
     }
   });
 
+  // ── Economic Calendar screenshot analysis — Gemini Vision ──────────────────
+  app.post('/api/marsad/analyze-calendar', checkAuth, async (req: any, res: any) => {
+    try {
+      const { imageBase64 } = req.body;
+      if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+      const dataMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!dataMatch) return res.status(400).json({ error: 'Invalid image format' });
+      const mimeType   = dataMatch[1];
+      const base64Data = dataMatch[2];
+
+      const calSchema = {
+        type: Type.OBJECT,
+        properties: {
+          date: { type: Type.STRING, description: 'Most prominent date in screenshot as YYYY-MM-DD, or today if unclear' },
+          events: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                time:     { type: Type.STRING, description: 'Event time HH:MM in 24h format (00:00 if All Day)' },
+                country:  { type: Type.STRING, description: 'Currency/country code: US, EU, GB, JP, CH, AU, CA, NZ, CN, DE, etc.' },
+                event:    { type: Type.STRING, description: 'Full event name exactly as shown' },
+                actual:   { type: Type.STRING, description: 'Actual value if shown, empty string if not released yet' },
+                forecast: { type: Type.STRING, description: 'Forecast/Expected value if shown, empty string if absent' },
+                previous: { type: Type.STRING, description: 'Previous value if shown, empty string if absent' },
+                impact:   { type: Type.STRING, description: 'Impact level: high (3 stars/red/HIGH), medium (2 stars/orange/MEDIUM), low (1 star/yellow/LOW). Use medium as default if unclear.' },
+                result:   { type: Type.STRING, description: 'beat if actual > forecast, miss if actual < forecast, neutral if equal or no actual yet' },
+              },
+              required: ['time', 'country', 'event', 'actual', 'forecast', 'previous', 'impact', 'result'],
+            },
+          },
+        },
+        required: ['date', 'events'],
+      };
+
+      const prompt = `أنت خبير في قراءة بيانات الأجندة الاقتصادية. قم بتحليل لقطة الشاشة هذه بعناية تامة واستخرج كافة الأحداث الاقتصادية المرئية في الجدول.
+
+لكل حدث استخرج:
+1. الوقت (بصيغة 24 ساعة HH:MM) — إذا كان "All Day" أو طوال اليوم استخدم 00:00
+2. رمز الدولة/العملة (US للدولار، EU لليورو، GB للجنيه، JP للين، CH للفرنك، AU للأسترالي، CA للكندي، NZ للنيوزيلندي، DE لألمانيا، إلخ)
+3. اسم الحدث كاملاً كما يظهر في الصورة
+4. القيمة الفعلية (Actual) — فارغة إن لم تظهر
+5. التوقعات (Forecast/Expected) — فارغة إن لم تظهر
+6. القيمة السابقة (Previous) — فارغة إن لم تظهر
+7. درجة التأثير: high (3 نجوم/أحمر/High)، medium (2 نجوم/برتقالي/Medium)، low (1 نجمة/أصفر/Low)
+8. النتيجة: beat إذا فعلي > توقعات، miss إذا فعلي < توقعات، neutral إذا متساوٍ أو لم يصدر بعد
+
+استخرج أيضاً التاريخ الأكثر ظهوراً في الصورة بصيغة YYYY-MM-DD.
+استخرج جميع الأحداث المرئية بدون استثناء، بما في ذلك الأحداث منخفضة التأثير.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ parts: [
+          { inlineData: { mimeType, data: base64Data } },
+          { text: prompt },
+        ]}],
+        config: { responseMimeType: 'application/json', responseSchema: calSchema },
+      });
+
+      const result = JSON.parse(response.text || '{}');
+      await logAction(req.user.id, 'ANALYZE_CALENDAR', 'marsad-card', null, `events=${result.events?.length ?? 0}`);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[AnalyzeCalendar] Error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── MT5 Proof-of-Trades screenshot analysis — Gemini Vision ─────────────────
   app.post('/api/marsad/analyze-pot', checkAuth, async (req: any, res: any) => {
     try {
