@@ -298,13 +298,40 @@ function drawCenteredPill(
   return pw;
 }
 
-// ── Country flag colors for calendar ─────────────────────────────────────────
+// ── Country flag images via flagcdn.com ───────────────────────────────────────
+// Maps our country codes → ISO 3166-1 alpha-2 used by flagcdn
+const COUNTRY_ISO: Record<string, string> = {
+  US: 'us', EUR: 'eu', EU: 'eu',
+  GB: 'gb', UK: 'gb',
+  JP: 'jp', CH: 'ch', CA: 'ca',
+  AU: 'au', NZ: 'nz', CN: 'cn',
+  DE: 'de', FR: 'fr', IT: 'it',
+  ES: 'es', KR: 'kr', IN: 'in',
+  SA: 'sa', AE: 'ae', KW: 'kw',
+  QA: 'qa', BR: 'br', MX: 'mx',
+  RU: 'ru', TR: 'tr', ZA: 'za',
+  SG: 'sg', HK: 'hk', NO: 'no',
+  SE: 'se', DK: 'dk', NL: 'nl',
+};
+
+// In-memory cache so each flag loads once per session
+const _flagCache: Record<string, HTMLImageElement> = {};
+
+async function loadFlag(countryCode: string): Promise<HTMLImageElement | null> {
+  const iso = COUNTRY_ISO[countryCode.toUpperCase()];
+  if (!iso) return null;
+  if (_flagCache[iso]) return _flagCache[iso];
+  const img = await loadImg(`https://flagcdn.com/w40/${iso}.png`);
+  if (img.width > 0) { _flagCache[iso] = img; return img; }
+  return null;
+}
+
+// Fallback solid color when flag image can't be loaded
 const COUNTRY_COLORS: Record<string, string> = {
   US: '#3C5D9C', EUR: '#003FA3', EU: '#003FA3',
-  GB: '#012169', JP: '#BC002D', CH: '#D52B1E',
-  CA: '#C8102E', AU: '#00008B', NZ: '#00247D',
-  CN: '#DE2910', SA: '#006C35', AE: '#00732F',
-  KW: '#007A3D', QA: '#8D1B3D',
+  GB: '#012169', UK: '#012169', JP: '#BC002D', CH: '#D52B1E',
+  CA: '#C8102E', AU: '#00008B', NZ: '#00247D', CN: '#DE2910',
+  DE: '#000000', FR: '#002395', SA: '#006C35', AE: '#00732F',
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -559,18 +586,24 @@ async function renderMarsadCalendar(
     ctx.fillText(ch.label, ch.x, tHdrY + tHdrH / 2);
   }
 
-  // Data rows
+  // Data rows — for...of so we can await flag images
   const events = data.events.slice(0, maxRows);
-  events.forEach((ev: CalendarEvent, i: number) => {
+
+  // Pre-fetch all unique flags in parallel before drawing
+  const uniqueCodes = [...new Set(events.map((e: CalendarEvent) => e.country))];
+  await Promise.all(uniqueCodes.map(loadFlag));
+
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
     const ry = tHdrY + tHdrH + i * rowH;
     const rowBg = i % 2 === 0 ? '#0A1628' : '#0E1C32';
     ctx.fillStyle = rowBg;
     ctx.fillRect(tableX, ry, tableW, rowH);
 
-    // Impact stripe (left edge in canvas = least-significant side in RTL → swap to right edge for Arabic UX)
+    // Impact stripe on right edge (RTL "start")
     const stripeColor = ev.impact === 'high' ? '#DC2626' : ev.impact === 'medium' ? '#F59E0B' : '#4B5563';
     ctx.fillStyle = stripeColor;
-    ctx.fillRect(tableX + tableW - 4, ry, 4, rowH); // right edge (RTL "start")
+    ctx.fillRect(tableX + tableW - 4, ry, 4, rowH);
 
     // Row separator
     ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 0.5;
@@ -584,16 +617,38 @@ async function renderMarsadCalendar(
     ctx.fillStyle = 'rgba(255,255,255,0.80)';
     ctx.fillText(ev.time, col.time + colW.time / 2, midY);
 
-    // Country flag (small square) + code
-    const flagColor = COUNTRY_COLORS[ev.country] || '#374151';
-    ctx.fillStyle = flagColor;
-    const flagW = 28, flagH = 18;
-    const flagX = col.country + (colW.country - flagW) / 2;
-    ctx.fillRect(flagX, midY - flagH / 2, flagW, flagH);
-    // Country code below flag
-    ctx.font = `500 14px Cairo, Arial, sans-serif`;
-    ctx.fillStyle = 'rgba(255,255,255,0.60)';
-    ctx.fillText(ev.country, col.country + colW.country / 2, midY + flagH / 2 + 10);
+    // Country flag image (pre-loaded into cache) + code label
+    const flagW = 32, flagH = 22;
+    const flagCX = col.country + colW.country / 2;
+    const flagY  = midY - 14;
+    const flagImg = await loadFlag(ev.country); // returns from cache instantly
+    if (flagImg) {
+      ctx.save();
+      const rx = 3, fx = flagCX - flagW / 2;
+      ctx.beginPath();
+      ctx.moveTo(fx + rx, flagY);
+      ctx.lineTo(fx + flagW - rx, flagY);
+      ctx.quadraticCurveTo(fx + flagW, flagY, fx + flagW, flagY + rx);
+      ctx.lineTo(fx + flagW, flagY + flagH - rx);
+      ctx.quadraticCurveTo(fx + flagW, flagY + flagH, fx + flagW - rx, flagY + flagH);
+      ctx.lineTo(fx + rx, flagY + flagH);
+      ctx.quadraticCurveTo(fx, flagY + flagH, fx, flagY + flagH - rx);
+      ctx.lineTo(fx, flagY + rx);
+      ctx.quadraticCurveTo(fx, flagY, fx + rx, flagY);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(flagImg, fx, flagY, flagW, flagH);
+      ctx.restore();
+    } else {
+      // Fallback: colored rect
+      ctx.fillStyle = COUNTRY_COLORS[ev.country] || '#374151';
+      ctx.fillRect(flagCX - flagW / 2, flagY, flagW, flagH);
+    }
+    // Country code label below flag
+    ctx.font = `500 13px Cairo, Arial, sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ev.country, flagCX, flagY + flagH + 11);
 
     // Event name (truncated)
     ctx.font = `600 20px Cairo, Arial, sans-serif`;
@@ -602,7 +657,7 @@ async function renderMarsadCalendar(
     const evLabel = ev.event.length > 28 ? ev.event.slice(0, 27) + '…' : ev.event;
     ctx.fillText(evLabel, col.event + colW.event - 6, midY);
 
-    // Actual (color-coded)
+    // Actual (color-coded: green=beat, red=miss, gray=neutral/pending)
     const actColor = ev.result === 'beat' ? '#10B981' : ev.result === 'miss' ? '#EF4444' : '#9CA3AF';
     ctx.font = `600 20px Cairo, Arial, sans-serif`;
     ctx.direction = 'ltr'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -615,7 +670,7 @@ async function renderMarsadCalendar(
 
     // Previous
     ctx.fillText(ev.previous ?? '—', col.previous + colW.previous / 2, midY);
-  });
+  }
 
   // Bottom table line
   const tableEndY = tHdrY + tHdrH + events.length * rowH;
