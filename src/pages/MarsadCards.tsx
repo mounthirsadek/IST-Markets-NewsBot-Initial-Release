@@ -247,8 +247,9 @@ export default function MarsadCards() {
       fetchWithAuth('/api/settings/brand-marsad-alsouq').then(r => r.ok ? r.json() : null).catch(() => null),
       fetchWithAuth('/api/settings/brand-ist-markets').then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([marsad, ist]) => {
-      const m = (marsad?.value) || {};
-      const i = (ist?.value)    || {};
+      // GET /api/settings/:key returns the value object directly (not wrapped in { value: ... })
+      const m = (marsad && typeof marsad === 'object' ? marsad : {}) as Record<string, any>;
+      const i = (ist    && typeof ist    === 'object' ? ist    : {}) as Record<string, any>;
       // Marsad settings take priority; IST logo fills in only if Marsad logo absent
       setBrandSettings({ ...m, logoUrl: m.logoUrl || i.logoUrl || '' });
     });
