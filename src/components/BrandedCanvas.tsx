@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import marsadIconUrl from '../assets/marsad-icon.svg';
 import type { CardType, SignalData, CalendarData, CalendarEvent, ProofOfTradesData, TradeEntry, WebinarData } from '../types/marsad-cards';
 
+type Lang = 'ar' | 'en' | 'both';
+
 interface BrandedCanvasProps {
   backgroundImage: string | null;
   storyImage: string | null;
@@ -21,6 +23,8 @@ interface BrandedCanvasProps {
   cardType?: CardType;
   /** Typed data for the selected card type */
   cardData?: SignalData | CalendarData | ProofOfTradesData | WebinarData;
+  /** Language mode for Marsad cards — 'ar' | 'en' | 'both' (default) */
+  cardLang?: 'ar' | 'en' | 'both';
   onExport?: (dataUrl: string) => void;
 }
 
@@ -132,7 +136,8 @@ function drawMarsadBg(ctx: CanvasRenderingContext2D, width: number, height: numb
 async function drawMarsadScopeHeader(
   ctx: CanvasRenderingContext2D,
   width: number,
-  cardX: number, cardY: number, cardW: number
+  cardX: number, cardY: number, cardW: number,
+  lang: Lang = 'both'
 ): Promise<number> {
   const iconSize = 52;
   const iconY    = cardY + 26;
@@ -149,31 +154,39 @@ async function drawMarsadScopeHeader(
     ctx.restore();
   }
 
-  // ── Draw "مرصد السوق" + "Marsad Al Souq" bilingual stack ────────────
+  // ── Draw "مرصد السوق" + "Marsad Al Souq" (language-aware) ────────────
   const fontSz    = Math.round(width * 0.046);
   const subFontSz = Math.round(width * 0.018);
-  const stackH    = fontSz + subFontSz + 4;
+  const stackH    = lang === 'both' ? fontSz + subFontSz + 4 : fontSz;
   const stackTopY = iconMidY - stackH / 2;
 
   ctx.save();
   ctx.shadowColor  = 'rgba(0,0,0,0.7)';
   ctx.shadowBlur   = 12;
 
-  // Arabic main title
-  ctx.font         = `900 ${fontSz}px Cairo, Arial, sans-serif`;
-  ctx.direction    = 'rtl';
-  ctx.textAlign    = 'right';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle    = GOLD;
-  ctx.fillText('مرصد السوق', iconX - 12, stackTopY);
+  if (lang !== 'en') {
+    // Arabic main title
+    ctx.font         = `900 ${fontSz}px Cairo, Arial, sans-serif`;
+    ctx.direction    = 'rtl';
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle    = GOLD;
+    ctx.fillText('مرصد السوق', iconX - 12, lang === 'both' ? stackTopY : iconMidY - fontSz / 2);
+  }
 
-  // English subtitle
-  ctx.font         = `500 ${subFontSz}px Montserrat, Arial, sans-serif`;
-  ctx.direction    = 'ltr';
-  ctx.textAlign    = 'right';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle    = 'rgba(255,255,255,0.45)';
-  ctx.fillText('Marsad Al Souq', iconX - 12, stackTopY + fontSz + 4);
+  if (lang !== 'ar') {
+    const enFontSz  = lang === 'en' ? fontSz : subFontSz;
+    const enWeight  = lang === 'en' ? '900' : '500';
+    const enFamily  = lang === 'en' ? 'Cairo, Arial, sans-serif' : 'Montserrat, Arial, sans-serif';
+    const enFill    = lang === 'en' ? GOLD : 'rgba(255,255,255,0.45)';
+    const enY       = lang === 'en' ? iconMidY - enFontSz / 2 : stackTopY + fontSz + 4;
+    ctx.font         = `${enWeight} ${enFontSz}px ${enFamily}`;
+    ctx.direction    = 'ltr';
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle    = enFill;
+    ctx.fillText('Marsad Al Souq', iconX - 12, enY);
+  }
 
   ctx.restore();
 
@@ -191,14 +204,15 @@ async function drawMarsadScopeHeader(
   ctx.lineTo(cardX + cardW - PAD, ruleY);
   ctx.stroke();
 
-  // ── English date — left side, below separator ────────────────────────────
-  const dateStr = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+  // ── Date — language-aware side, below separator ──────────────────────────
+  const dateLocale = lang === 'ar' ? 'ar-EG' : 'en-US';
+  const dateStr = new Date().toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' });
   ctx.font         = `400 ${Math.round(width * 0.018)}px Cairo, Arial, sans-serif`;
-  ctx.direction    = 'ltr';
-  ctx.textAlign    = 'left';
+  ctx.direction    = lang === 'ar' ? 'rtl' : 'ltr';
+  ctx.textAlign    = lang === 'ar' ? 'right' : 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle    = 'rgba(255,255,255,0.42)';
-  ctx.fillText(dateStr, cardX + PAD, ruleY + 10);
+  ctx.fillText(dateStr, lang === 'ar' ? cardX + cardW - PAD : cardX + PAD, ruleY + 10);
 
   return ruleY;
 }
@@ -357,7 +371,8 @@ async function renderMarsadSignal(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: SignalData,
-  logoUrl: string, tagline = '', disclaimer = ''
+  logoUrl: string, tagline = '', disclaimer = '',
+  lang: Lang = 'both'
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -368,7 +383,7 @@ async function renderMarsadSignal(
   // Scaling proportionally makes every layout fit any canvas height.
   const s = cardH / 1600;
 
-  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
+  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW, lang);
 
   // ── Asset type + Timeframe pills ────────────────────────────────────────
   const pillY  = cardY + Math.round(185 * s);
@@ -413,7 +428,11 @@ async function renderMarsadSignal(
   const isBuy    = data.direction === 'BUY';
   const dirColor = isBuy ? '#10B981' : '#DC2626';
   const dirBg    = isBuy ? 'rgba(16,185,129,0.18)' : 'rgba(220,38,38,0.18)';
-  const dirLabel = isBuy ? '▲   BUY  /  شراء' : '▼   SELL  /  بيع';
+  const dirLabel = lang === 'ar'
+    ? (isBuy ? '▲   شراء' : '▼   بيع')
+    : lang === 'en'
+    ? (isBuy ? '▲   BUY' : '▼   SELL')
+    : (isBuy ? '▲   BUY  /  شراء' : '▼   SELL  /  بيع');
   const dirFontSz = Math.round(30 * s);
   ctx.font = `700 ${dirFontSz}px Cairo, Arial, sans-serif`;
   const dirW = ctx.measureText(dirLabel).width + 70;
@@ -458,7 +477,10 @@ async function renderMarsadSignal(
     ctx.font = `400 ${Math.round(26 * s)}px Cairo, Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillText('Chart Screenshot  /  لقطة الرسم البياني', chartX + chartW / 2, chartY + chartH / 2);
+    ctx.fillText(
+      lang === 'ar' ? 'لقطة الرسم البياني' : lang === 'en' ? 'Chart Screenshot' : 'Chart Screenshot  /  لقطة الرسم البياني',
+      chartX + chartW / 2, chartY + chartH / 2
+    );
   }
   ctx.restore();
 
@@ -487,18 +509,28 @@ async function renderMarsadSignal(
     ctx.fillStyle = lv.bg; ctx.fill();
     ctx.strokeStyle = lv.color; ctx.lineWidth = 1.2; ctx.stroke();
 
-    // Arabic label
-    ctx.font = `600 ${Math.round(20 * s)}px Cairo, Arial, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillStyle = lv.color;
-    ctx.direction = 'rtl';
-    ctx.fillText(lv.label, lv.x + lcW / 2, lcY + Math.round(10 * s));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = lv.color;
 
-    // English sub-label
-    ctx.font = `500 ${Math.round(13 * s)}px Montserrat, Arial, sans-serif`;
-    ctx.direction = 'ltr';
-    ctx.fillStyle = lv.color + '88';
-    ctx.fillText(lv.labelEn, lv.x + lcW / 2, lcY + Math.round(32 * s));
+    if (lang === 'en') {
+      // English-only: large label, no Arabic
+      ctx.font = `700 ${Math.round(20 * s)}px Montserrat, Arial, sans-serif`;
+      ctx.direction = 'ltr';
+      ctx.fillText(lv.labelEn, lv.x + lcW / 2, lcY + Math.round(10 * s));
+    } else if (lang === 'ar') {
+      // Arabic-only: large label, no English
+      ctx.font = `600 ${Math.round(22 * s)}px Cairo, Arial, sans-serif`;
+      ctx.direction = 'rtl';
+      ctx.fillText(lv.label, lv.x + lcW / 2, lcY + Math.round(10 * s));
+    } else {
+      // Both: Arabic label + English sub-label
+      ctx.font = `600 ${Math.round(20 * s)}px Cairo, Arial, sans-serif`;
+      ctx.direction = 'rtl';
+      ctx.fillText(lv.label, lv.x + lcW / 2, lcY + Math.round(10 * s));
+      ctx.font = `500 ${Math.round(13 * s)}px Montserrat, Arial, sans-serif`;
+      ctx.direction = 'ltr';
+      ctx.fillStyle = lv.color + '88';
+      ctx.fillText(lv.labelEn, lv.x + lcW / 2, lcY + Math.round(32 * s));
+    }
 
     // Value
     ctx.font = `700 ${Math.round(28 * s)}px Montserrat, Arial, sans-serif`;
@@ -526,7 +558,12 @@ async function renderMarsadSignal(
   ctx.font = `700 ${Math.round(28 * s)}px Cairo, Arial, sans-serif`;
   ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
   ctx.fillStyle = GOLD;
-  ctx.fillText(`نسبة المخاطرة  /  Risk:Reward:  ${data.rrRatio}`, cardX + cardW - PAD, contentEndY + Math.round(10 * s));
+  const rrLabel = lang === 'ar'
+    ? `نسبة المخاطرة:  ${data.rrRatio}`
+    : lang === 'en'
+    ? `Risk:Reward:  ${data.rrRatio}`
+    : `نسبة المخاطرة  /  Risk:Reward:  ${data.rrRatio}`;
+  ctx.fillText(rrLabel, cardX + cardW - PAD, contentEndY + Math.round(10 * s));
 
   await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
 }
@@ -539,7 +576,8 @@ async function renderMarsadCalendar(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: CalendarData,
-  logoUrl: string, tagline = '', disclaimer = ''
+  logoUrl: string, tagline = '', disclaimer = '',
+  lang: Lang = 'both'
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -547,24 +585,32 @@ async function renderMarsadCalendar(
   const cx = cardX + cardW / 2;
   const s = cardH / 1600;  // proportional scale factor
 
-  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
+  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW, lang);
 
-  // ── Title (bilingual) ────────────────────────────────────────────────────
+  // ── Title (language-aware) ───────────────────────────────────────────────
   const calTitleY = cardY + Math.round(155 * s);
-  ctx.font = `900 ${Math.round(50 * s)}px Cairo, Arial, sans-serif`;
-  ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-  ctx.fillStyle = GOLD;
-  ctx.fillText('الأجندة الاقتصادية', cardX + cardW - PAD, calTitleY);
-
-  ctx.font = `500 ${Math.round(20 * s)}px Montserrat, Arial, sans-serif`;
-  ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(255,255,255,0.38)';
-  ctx.fillText('ECONOMIC CALENDAR', cardX + PAD, calTitleY + Math.round(4 * s));
+  if (lang !== 'en') {
+    ctx.font = `900 ${Math.round(50 * s)}px Cairo, Arial, sans-serif`;
+    ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillStyle = GOLD;
+    ctx.fillText('الأجندة الاقتصادية', cardX + cardW - PAD, calTitleY);
+  }
+  if (lang !== 'ar') {
+    const enCalFontSz = lang === 'en' ? Math.round(50 * s) : Math.round(20 * s);
+    const enCalFill   = lang === 'en' ? GOLD : 'rgba(255,255,255,0.38)';
+    ctx.font = `${lang === 'en' ? '900' : '500'} ${enCalFontSz}px ${lang === 'en' ? 'Cairo' : 'Montserrat'}, Arial, sans-serif`;
+    ctx.direction = lang === 'en' ? 'rtl' : 'ltr';
+    ctx.textAlign = lang === 'en' ? 'right' : 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = enCalFill;
+    ctx.fillText('ECONOMIC CALENDAR', lang === 'en' ? cardX + cardW - PAD : cardX + PAD, calTitleY + Math.round(4 * s));
+  }
 
   // ── Date pill ────────────────────────────────────────────────────────────
+  const calDateLocale = lang === 'en' ? 'en-US' : 'ar-EG';
   const dateDisplay = data.date
-    ? new Date(data.date + 'T00:00:00').toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    : new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    ? new Date(data.date + 'T00:00:00').toLocaleDateString(calDateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString(calDateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   drawCenteredPill(ctx, dateDisplay, cx, cardY + Math.round(270 * s), '#0A1628', GOLD, GOLD,
     Math.round(22 * s), Math.round(48 * s), 24, 28);
@@ -608,17 +654,26 @@ async function renderMarsadCalendar(
 
   const hdrMidY = tHdrY + tHdrH / 2;
   for (const ch of colHeaders) {
-    // Arabic label above center
-    ctx.font = `600 ${Math.round(18 * s)}px Cairo, Arial, sans-serif`;
-    ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillStyle = GOLD;
-    ctx.fillText(ch.label, ch.x, hdrMidY - 1);
-
-    // English sub-label below center
-    ctx.font = `500 ${Math.round(13 * s)}px Montserrat, Arial, sans-serif`;
-    ctx.direction = 'ltr'; ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(255,255,255,0.30)';
-    ctx.fillText(ch.labelEn, ch.x, hdrMidY + 2);
+    ctx.textAlign = 'center';
+    if (lang === 'en') {
+      ctx.font = `700 ${Math.round(18 * s)}px Montserrat, Arial, sans-serif`;
+      ctx.direction = 'ltr'; ctx.textBaseline = 'middle';
+      ctx.fillText(ch.labelEn, ch.x, hdrMidY);
+    } else if (lang === 'ar') {
+      ctx.font = `700 ${Math.round(18 * s)}px Cairo, Arial, sans-serif`;
+      ctx.direction = 'rtl'; ctx.textBaseline = 'middle';
+      ctx.fillText(ch.label, ch.x, hdrMidY);
+    } else {
+      // Both: Arabic above, English below
+      ctx.font = `600 ${Math.round(18 * s)}px Cairo, Arial, sans-serif`;
+      ctx.direction = 'rtl'; ctx.textBaseline = 'bottom';
+      ctx.fillText(ch.label, ch.x, hdrMidY - 1);
+      ctx.font = `500 ${Math.round(13 * s)}px Montserrat, Arial, sans-serif`;
+      ctx.direction = 'ltr'; ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      ctx.fillText(ch.labelEn, ch.x, hdrMidY + 2);
+    }
   }
 
   // Data rows — for...of so we can await flag images
@@ -713,24 +768,44 @@ async function renderMarsadCalendar(
 
   // ── Legend (y ≈ tableEndY + 20) ──────────────────────────────────────────
   const legendY = tableEndY + 35;
-  const legendItems = [
-    { label: 'أعلى من المتوقع', color: '#10B981' },
-    { label: 'أدنى من المتوقع', color: '#EF4444' },
-    { label: 'لم يصدر',         color: '#6B7280' },
-  ];
+  const legendItems = lang === 'en'
+    ? [
+        { label: 'Beat Forecast',    color: '#10B981' },
+        { label: 'Missed Forecast',  color: '#EF4444' },
+        { label: 'Not Released',     color: '#6B7280' },
+      ]
+    : [
+        { label: 'أعلى من المتوقع', color: '#10B981' },
+        { label: 'أدنى من المتوقع', color: '#EF4444' },
+        { label: 'لم يصدر',         color: '#6B7280' },
+      ];
   ctx.font = `400 20px Cairo, Arial, sans-serif`;
-  ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-  let legX = cardX + cardW - PAD;
+  if (lang === 'en') {
+    ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  } else {
+    ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  }
+  let legX = lang === 'en' ? cardX + PAD : cardX + cardW - PAD;
   for (const lg of legendItems) {
     const textW = ctx.measureText(lg.label).width;
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText(lg.label, legX, legendY);
-    legX -= textW + 10;
-    // dot
-    ctx.beginPath();
-    ctx.arc(legX, legendY, 6, 0, Math.PI * 2);
-    ctx.fillStyle = lg.color; ctx.fill();
-    legX -= 20;
+    if (lang === 'en') {
+      // dot first, then text
+      ctx.beginPath();
+      ctx.arc(legX + 6, legendY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = lg.color; ctx.fill();
+      legX += 18;
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillText(lg.label, legX, legendY);
+      legX += textW + 20;
+    } else {
+      ctx.fillText(lg.label, legX, legendY);
+      legX -= textW + 10;
+      ctx.beginPath();
+      ctx.arc(legX, legendY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = lg.color; ctx.fill();
+      legX -= 20;
+    }
   }
 
   await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
@@ -744,7 +819,8 @@ async function renderMarsadProofOfTrades(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: ProofOfTradesData,
-  logoUrl: string, tagline = '', disclaimer = ''
+  logoUrl: string, tagline = '', disclaimer = '',
+  lang: Lang = 'both'
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -752,25 +828,38 @@ async function renderMarsadProofOfTrades(
   const cx = cardX + cardW / 2;
   const s = cardH / 1600;  // proportional scale factor
 
-  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
+  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW, lang);
 
-  // ── Title (bilingual) ────────────────────────────────────────────────────
+  // ── Title (language-aware) ───────────────────────────────────────────────
   const potTitleY = cardY + Math.round(155 * s);
-  ctx.font = `900 ${Math.round(50 * s)}px Cairo, Arial, sans-serif`;
-  ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-  ctx.fillStyle = GOLD;
-  ctx.fillText('إثبات الصفقات', cardX + cardW - PAD, potTitleY);
+  if (lang !== 'en') {
+    ctx.font = `900 ${Math.round(50 * s)}px Cairo, Arial, sans-serif`;
+    ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillStyle = GOLD;
+    ctx.fillText('إثبات الصفقات', cardX + cardW - PAD, potTitleY);
+  }
+  if (lang !== 'ar') {
+    const enPotFontSz = lang === 'en' ? Math.round(50 * s) : Math.round(20 * s);
+    ctx.font = `${lang === 'en' ? '900' : '500'} ${enPotFontSz}px ${lang === 'en' ? 'Cairo' : 'Montserrat'}, Arial, sans-serif`;
+    ctx.direction = lang === 'en' ? 'rtl' : 'ltr';
+    ctx.textAlign = lang === 'en' ? 'right' : 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = lang === 'en' ? GOLD : 'rgba(255,255,255,0.38)';
+    ctx.fillText('PROOF OF TRADES', lang === 'en' ? cardX + cardW - PAD : cardX + PAD, potTitleY + Math.round(4 * s));
+  }
 
-  ctx.font = `500 ${Math.round(20 * s)}px Montserrat, Arial, sans-serif`;
-  ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(255,255,255,0.38)';
-  ctx.fillText('PROOF OF TRADES', cardX + PAD, potTitleY + Math.round(4 * s));
-
-  // Subtitle (bilingual)
+  // Subtitle (language-aware)
+  const potSubtitle = lang === 'ar'
+    ? 'MetaTrader 5  ·  لقطة شاشة'
+    : lang === 'en'
+    ? 'MetaTrader 5  ·  Account Statement'
+    : 'MetaTrader 5  ·  لقطة شاشة  ·  Account Statement';
   ctx.font = `400 ${Math.round(22 * s)}px Cairo, Arial, sans-serif`;
-  ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  ctx.direction = lang === 'en' ? 'ltr' : 'rtl';
+  ctx.textAlign = lang === 'en' ? 'left' : 'right';
+  ctx.textBaseline = 'top';
   ctx.fillStyle = 'rgba(255,255,255,0.40)';
-  ctx.fillText('MetaTrader 5  ·  لقطة شاشة  ·  Account Statement', cardX + cardW - PAD, cardY + Math.round(222 * s));
+  ctx.fillText(potSubtitle, lang === 'en' ? cardX + PAD : cardX + cardW - PAD, cardY + Math.round(222 * s));
 
   // Period pill
   if (data.period) {
@@ -818,7 +907,7 @@ async function renderMarsadProofOfTrades(
     ctx.font = `400 24px Cairo, Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillText('أرفق لقطة شاشة MT5', ssX + ssW / 2, ssY + ssH / 2);
+    ctx.fillText(lang === 'en' ? 'Attach MT5 Screenshot' : 'أرفق لقطة شاشة MT5', ssX + ssW / 2, ssY + ssH / 2);
   }
 
   roundedRectPath(ctx, ssX, ssY, ssW, ssH, 10);
@@ -859,15 +948,24 @@ async function renderMarsadProofOfTrades(
 
   const potHdrMidY = tHdrY + tHdrH / 2;
   for (const h of hdrs2) {
-    ctx.font = `600 17px Cairo, Arial, sans-serif`;
-    ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillStyle = GOLD;
-    ctx.fillText(h.label, h.x, potHdrMidY - 1);
-
-    ctx.font = `500 11px Montserrat, Arial, sans-serif`;
-    ctx.direction = 'ltr'; ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(255,255,255,0.28)';
-    ctx.fillText(h.labelEn, h.x, potHdrMidY + 2);
+    ctx.textAlign = 'center'; ctx.fillStyle = GOLD;
+    if (lang === 'en') {
+      ctx.font = `700 14px Montserrat, Arial, sans-serif`;
+      ctx.direction = 'ltr'; ctx.textBaseline = 'middle';
+      ctx.fillText(h.labelEn, h.x, potHdrMidY);
+    } else if (lang === 'ar') {
+      ctx.font = `700 17px Cairo, Arial, sans-serif`;
+      ctx.direction = 'rtl'; ctx.textBaseline = 'middle';
+      ctx.fillText(h.label, h.x, potHdrMidY);
+    } else {
+      ctx.font = `600 17px Cairo, Arial, sans-serif`;
+      ctx.direction = 'rtl'; ctx.textBaseline = 'bottom';
+      ctx.fillText(h.label, h.x, potHdrMidY - 1);
+      ctx.font = `500 11px Montserrat, Arial, sans-serif`;
+      ctx.direction = 'ltr'; ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.fillText(h.labelEn, h.x, potHdrMidY + 2);
+    }
   }
   drawGoldRule(ctx, cardX, tHdrY + tHdrH, cardW, 0.15);
 
@@ -926,16 +1024,24 @@ async function renderMarsadProofOfTrades(
   ctx.strokeStyle = GOLD + '30'; ctx.lineWidth = 1; ctx.stroke();
 
   ctx.font = `700 26px Cairo, Arial, sans-serif`;
-  ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.direction = lang === 'en' ? 'ltr' : 'rtl';
+  ctx.textAlign = lang === 'en' ? 'left' : 'right';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = GOLD;
-  ctx.fillText('الإجمالي', tableX + tableW - 16, totalY + totalH / 2);
+  ctx.fillText(lang === 'en' ? 'TOTAL' : 'الإجمالي', lang === 'en' ? tableX + 16 : tableX + tableW - 16, totalY + totalH / 2);
 
   ctx.font = `800 28px Cairo, Arial, sans-serif`;
-  ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   const totalColor = data.totalProfit >= 0 ? '#10B981' : '#EF4444';
   ctx.fillStyle = totalColor;
+  ctx.textBaseline = 'middle';
   const totalStr = (data.totalProfit >= 0 ? '+' : '') + data.totalProfit.toFixed(2) + ' $';
-  ctx.fillText(totalStr, tableX + 16, totalY + totalH / 2);
+  if (lang === 'en') {
+    ctx.direction = 'ltr'; ctx.textAlign = 'right';
+    ctx.fillText(totalStr, tableX + tableW - 16, totalY + totalH / 2);
+  } else {
+    ctx.direction = 'ltr'; ctx.textAlign = 'left';
+    ctx.fillText(totalStr, tableX + 16, totalY + totalH / 2);
+  }
 
   await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
 }
@@ -948,7 +1054,8 @@ async function renderMarsadWebinar(
   ctx: CanvasRenderingContext2D,
   width: number, height: number,
   data: WebinarData,
-  logoUrl: string, tagline = '', disclaimer = ''
+  logoUrl: string, tagline = '', disclaimer = '',
+  lang: Lang = 'both'
 ) {
   try { await document.fonts.load('900 60px Cairo'); } catch { /* ignore */ }
 
@@ -965,17 +1072,18 @@ async function renderMarsadWebinar(
   glowBL.addColorStop(0, '#1E88E5' + '0F'); glowBL.addColorStop(1, 'transparent');
   ctx.fillStyle = glowBL; ctx.fillRect(cardX, cardY, cardW, cardH);
 
-  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW);
+  await drawMarsadScopeHeader(ctx, width, cardX, cardY, cardW, lang);
 
-  // ── Event badge (bilingual) ──────────────────────────────────────────────
-  drawCenteredPill(ctx, '🎙️  ندوة مباشرة  ·  LIVE WEBINAR', cx, cardY + Math.round(200 * s),
+  // ── Event badge (language-aware) ─────────────────────────────────────────
+  const webinarBadge = lang === 'ar' ? '🎙️  ندوة مباشرة' : lang === 'en' ? '🎙️  LIVE WEBINAR' : '🎙️  ندوة مباشرة  ·  LIVE WEBINAR';
+  drawCenteredPill(ctx, webinarBadge, cx, cardY + Math.round(200 * s),
     '#0A1628', GOLD, GOLD, Math.round(22 * s), Math.round(52 * s), 27, 32);
 
   // ── Event title ───────────────────────────────────────────────────────────
   const titleFontSz = Math.round(64 * s);
   const titleLineH  = Math.round(80 * s);
   ctx.font = `800 ${titleFontSz}px Cairo, Arial, sans-serif`;
-  ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.direction = lang === 'en' ? 'ltr' : 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillStyle = '#FFFFFF';
   ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 24;
   const titleLines = wrapText(ctx, data.title || 'عنوان الندوة', cardW - PAD * 3);
@@ -1046,7 +1154,7 @@ async function renderMarsadWebinar(
     ctx.font = `600 22px Cairo, Arial, sans-serif`;
     ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillStyle = GOLD;
-    ctx.fillText('امسح للتسجيل', cx, qrY + qrSize + 14);
+    ctx.fillText(lang === 'en' ? 'Scan to Register' : 'امسح للتسجيل', cx, qrY + qrSize + 14);
 
     contentY = qrY + qrSize + 52;
   } else if (data.bookingUrl) {
@@ -1060,7 +1168,7 @@ async function renderMarsadWebinar(
     ctx.font = `400 20px Cairo, Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = GOLD + '60';
-    ctx.fillText('رمز QR', cx, contentY + 10 + qrSize / 2);
+    ctx.fillText(lang === 'en' ? 'QR Code' : 'رمز QR', cx, contentY + 10 + qrSize / 2);
     contentY += qrSize + 30;
   }
 
@@ -1091,7 +1199,7 @@ async function renderMarsadWebinar(
     ctx.font = `400 24px Cairo, Arial, sans-serif`;
     ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillStyle = 'rgba(255,255,255,0.50)';
-    ctx.fillText('يقدمها: ' + data.hostName, cx, contentY + 10);
+    ctx.fillText((lang === 'en' ? 'Host: ' : 'يقدمها: ') + data.hostName, cx, contentY + 10);
   }
 
   await drawMarsadFooter(ctx, width, cardX, cardY, cardW, cardH, logoUrl, tagline, disclaimer);
@@ -1251,6 +1359,36 @@ async function renderMarsad(
   ctx.restore();
 }
 
+// ── Off-screen render utility — used by MarsadCards for dual-language export ──
+export async function renderMarsadCardToDataUrl(
+  cardType: CardType,
+  cardData: SignalData | CalendarData | ProofOfTradesData | WebinarData,
+  lang: Lang,
+  width: number,
+  height: number,
+  logoUrl: string,
+  tagline: string,
+  disclaimer: string
+): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width  = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context unavailable');
+
+  if (cardType === 'signal') {
+    await renderMarsadSignal(ctx, width, height, cardData as SignalData, logoUrl, tagline, disclaimer, lang);
+  } else if (cardType === 'calendar') {
+    await renderMarsadCalendar(ctx, width, height, cardData as CalendarData, logoUrl, tagline, disclaimer, lang);
+  } else if (cardType === 'proof-of-trades') {
+    await renderMarsadProofOfTrades(ctx, width, height, cardData as ProofOfTradesData, logoUrl, tagline, disclaimer, lang);
+  } else if (cardType === 'webinar') {
+    await renderMarsadWebinar(ctx, width, height, cardData as WebinarData, logoUrl, tagline, disclaimer, lang);
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BrandedCanvas({
   backgroundImage,
@@ -1269,6 +1407,7 @@ export default function BrandedCanvas({
   brandId,
   cardType,
   cardData,
+  cardLang = 'both',
   onExport
 }: BrandedCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1283,13 +1422,13 @@ export default function BrandedCanvas({
       // ── Marsad Al Souq theme ──────────────────────────────────────────────
       if (brandId === 'marsad-alsouq') {
         if (cardType === 'signal' && cardData) {
-          await renderMarsadSignal(ctx, width, height, cardData as SignalData, logoUrl, tagline, disclaimer);
+          await renderMarsadSignal(ctx, width, height, cardData as SignalData, logoUrl, tagline, disclaimer, cardLang);
         } else if (cardType === 'calendar' && cardData) {
-          await renderMarsadCalendar(ctx, width, height, cardData as CalendarData, logoUrl, tagline, disclaimer);
+          await renderMarsadCalendar(ctx, width, height, cardData as CalendarData, logoUrl, tagline, disclaimer, cardLang);
         } else if (cardType === 'proof-of-trades' && cardData) {
-          await renderMarsadProofOfTrades(ctx, width, height, cardData as ProofOfTradesData, logoUrl, tagline, disclaimer);
+          await renderMarsadProofOfTrades(ctx, width, height, cardData as ProofOfTradesData, logoUrl, tagline, disclaimer, cardLang);
         } else if (cardType === 'webinar' && cardData) {
-          await renderMarsadWebinar(ctx, width, height, cardData as WebinarData, logoUrl, tagline, disclaimer);
+          await renderMarsadWebinar(ctx, width, height, cardData as WebinarData, logoUrl, tagline, disclaimer, cardLang);
         } else {
           // Default: Marsad news card
           await renderMarsad(ctx, width, height, {
@@ -1477,7 +1616,7 @@ export default function BrandedCanvas({
   }, [
     backgroundImage, storyImage, headline, accentColor, logoUrl, tagline,
     disclaimer, language, width, height, brandId, onExport,
-    cardType,
+    cardType, cardLang,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     JSON.stringify(cardData),
   ]);

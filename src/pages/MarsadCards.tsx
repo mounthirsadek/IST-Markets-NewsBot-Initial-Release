@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Send, Download, RefreshCw, Plus, Trash2, Zap, Calendar, TrendingUp, Radio, ChevronRight, Sparkles, User, ImageIcon, X, Loader2, AlertCircle } from 'lucide-react';
 import { useBrandStore } from '../context/BrandContext';
 import { fetchWithAuth } from '../lib/api';
-import BrandedCanvas from '../components/BrandedCanvas';
+import BrandedCanvas, { renderMarsadCardToDataUrl } from '../components/BrandedCanvas';
 import { fetchMetricoolBrands, scheduleToMetricool, MetricoolBrand, getConnectedNetworks } from '../services/metricoolService';
 import type {
   CardType, SignalData, CalendarData, CalendarEvent,
@@ -302,13 +302,44 @@ export default function MarsadCards() {
   const activeImageUrl = (activeTab === 'webinar' && aiWebinarImage) ? aiWebinarImage : cardDataUrl;
 
   // ── Download PNG ──────────────────────────────────────────────────────────
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
     if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
-    const a = document.createElement('a');
-    a.href = activeImageUrl;
-    a.download = `marsad-${activeTab}-${Date.now()}.png`;
-    a.click();
-  }, [activeImageUrl, activeTab, showToast]);
+    const ts = Date.now();
+    const cardData = activeTab === 'signal' ? signal
+      : activeTab === 'calendar' ? calendar
+      : activeTab === 'proof-of-trades' ? pot
+      : webinar;
+
+    // Download Arabic version
+    try {
+      const arUrl = await renderMarsadCardToDataUrl(
+        activeTab, cardData, 'ar',
+        activeBrand.canvasWidth, activeBrand.canvasHeight,
+        brandSettings.logoUrl || '', brandSettings.fixedTagline || '', brandSettings.footerDisclaimer || ''
+      );
+      const aAr = document.createElement('a');
+      aAr.href = arUrl;
+      aAr.download = `marsad-${activeTab}-AR-${ts}.png`;
+      aAr.click();
+    } catch (e) { /* ignore */ }
+
+    // Small delay then download English version
+    await new Promise(r => setTimeout(r, 400));
+
+    try {
+      const enUrl = await renderMarsadCardToDataUrl(
+        activeTab, cardData, 'en',
+        activeBrand.canvasWidth, activeBrand.canvasHeight,
+        brandSettings.logoUrl || '', brandSettings.fixedTagline || '', brandSettings.footerDisclaimer || ''
+      );
+      const aEn = document.createElement('a');
+      aEn.href = enUrl;
+      aEn.download = `marsad-${activeTab}-EN-${ts}.png`;
+      aEn.click();
+    } catch (e) { /* ignore */ }
+
+    showToast('success', 'Downloaded Arabic + English versions ✓');
+  }, [activeImageUrl, activeTab, signal, calendar, pot, webinar, activeBrand, brandSettings, showToast]);
 
   // ── Publish to Telegram ───────────────────────────────────────────────────
   const handlePublish = useCallback(async () => {
@@ -1100,9 +1131,10 @@ export default function MarsadCards() {
           {/* ── Action buttons ────────────────────────────────────────────── */}
           <div className="flex gap-2 pt-2 sticky bottom-0 bg-[#0a0a0a] pb-1">
             <button onClick={handleDownload}
-              className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+              className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+              title="Downloads Arabic + English versions">
               <Download size={14} />
-              Download
+              Download AR + EN
             </button>
             <button onClick={openMetricool} disabled={!activeImageUrl}
               className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium bg-purple-500/10 border border-purple-500/25 text-purple-300 hover:bg-purple-500/20 transition-colors disabled:opacity-40">
