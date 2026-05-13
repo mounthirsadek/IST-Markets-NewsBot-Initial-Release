@@ -212,6 +212,11 @@ async function initSchema() {
       "ALTER TABLE stories MODIFY COLUMN status ENUM('draft','review','approved','scheduled','published','rejected') DEFAULT 'draft'",
       // Multi-brand support
       "ALTER TABLE stories ADD COLUMN brand_id VARCHAR(50) NOT NULL DEFAULT 'ist-markets'",
+      // Fix: image_url must be MEDIUMTEXT (AI images are base64 data URLs, >2000 chars)
+      "ALTER TABLE stories MODIFY COLUMN image_url MEDIUMTEXT",
+      // Branded canvas snapshots (compressed JPEG data URLs saved alongside stories)
+      "ALTER TABLE stories ADD COLUMN en_branded_url MEDIUMTEXT",
+      "ALTER TABLE stories ADD COLUMN ar_branded_url MEDIUMTEXT",
     ];
     for (const sql of migrations) {
       try { await conn.query(sql); } catch (_) { /* column already exists or no change needed */ }

@@ -279,13 +279,15 @@ export default function HooksEditor() {
       const finalEn = enBrandedUrl ? await compressCanvasImage(enBrandedUrl) : '';
       const finalAr = arBrandedUrl ? await compressCanvasImage(arBrandedUrl) : '';
 
-      await fetchWithAuth('/api/stories', {
+      const res = await fetchWithAuth('/api/stories', {
         method: 'POST',
         body: JSON.stringify({
           news_id: selectedArticle?.id || null,
           headline_en: enHeadline, caption_en: enCaption, hashtags_en: enHashtags,
           headline_ar: arHeadline, caption_ar: arCaption, hashtags_ar: arHashtags,
           image_url: imageUrl,
+          en_branded_url: finalEn || undefined,
+          ar_branded_url: finalAr || undefined,
           format: selectedFormat,
           status: 'draft',
           brand_id: activeBrand.id,
@@ -293,9 +295,15 @@ export default function HooksEditor() {
         }),
       });
 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error || `Save failed (HTTP ${res.status})`);
+      }
+
       navigate('/archive');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save failed', err);
+      alert(`Failed to save: ${err.message}`);
     } finally {
       setSaving(false);
     }

@@ -380,12 +380,20 @@ export default function Editor() {
           caption_ar: arCaption,
           hashtags_ar: arHashtags,
           image_url: imageUrl,
+          en_branded_url: finalEnBrandedUrl || undefined,
+          ar_branded_url: finalArBrandedUrl || undefined,
           format: selectedFormat,
           status,
           brand_id: activeBrand.id,
           created_by: user?.id,
         }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Save failed (HTTP ${res.status})`);
+      }
+
       const data = await res.json();
 
       if (status === 'draft') {
@@ -393,8 +401,9 @@ export default function Editor() {
       } else {
         navigate(`/publish/${data.id}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save failed", error);
+      alert(`Failed to save: ${error.message}`);
     } finally {
       setLoading(false);
     }

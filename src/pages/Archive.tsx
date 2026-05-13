@@ -329,13 +329,52 @@ export default function Archive() {
         const res = await fetchWithAuth('/api/stories');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        // Sort by createdAt descending
-        const sorted = (Array.isArray(data) ? data : []).sort((a: any, b: any) => {
-          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+        // ── Transform flat MySQL rows → nested Story shape ──────────────────
+        const parseArr = (v: any): string[] => {
+          if (!v) return [];
+          if (Array.isArray(v)) return v;
+          try { return JSON.parse(v); } catch { return []; }
+        };
+
+        const rows: Story[] = (Array.isArray(data) ? data : []).map((row: any) => ({
+          id:                 row.id,
+          originalArticleId: row.news_id || undefined,
+          en: {
+            headline: row.headline_en || '',
+            caption:  row.en_caption_final || row.caption_en || '',
+            hashtags: parseArr(row.hashtags_en),
+          },
+          ar: {
+            headline: row.headline_ar || '',
+            caption:  row.ar_caption_final || row.caption_ar || '',
+            hashtags: parseArr(row.hashtags_ar),
+          },
+          imageUrl:      row.image_url   || undefined,
+          enBrandedUrl:  row.en_branded_url || undefined,
+          arBrandedUrl:  row.ar_branded_url || undefined,
+          status:        (['draft','scheduled','published'].includes(row.status)
+                           ? row.status : 'draft') as Story['status'],
+          format:        row.format    || undefined,
+          createdBy:     row.created_by || undefined,
+          createdAt:     row.created_at,
+          publishedAt:   row.published_at || undefined,
+          publishInfo:   (() => {
+            if (!row.publish_info) return undefined;
+            try { return typeof row.publish_info === 'string'
+                    ? JSON.parse(row.publish_info) : row.publish_info; }
+            catch { return undefined; }
+          })(),
+        }));
+
+        // Sort newest first
+        rows.sort((a, b) => {
+          const ta = a.createdAt ? new Date(a.createdAt as string).getTime() : 0;
+          const tb = b.createdAt ? new Date(b.createdAt as string).getTime() : 0;
           return tb - ta;
         });
-        setStories(sorted);
+
+        setStories(rows);
       } catch (err) {
         console.error('Archive fetch error:', err);
       } finally {
