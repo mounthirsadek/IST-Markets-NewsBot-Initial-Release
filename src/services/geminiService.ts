@@ -69,6 +69,22 @@ export const generateStoryImage = async (brief: string, aspectRatio = '1:1', pro
 export const generateSocialCaption = (headline: string, caption: string) =>
   callAI<SocialPackage>('social-caption', { headline, caption });
 
+// ── AI Full Design (GPT Image-1 generates entire news card) ──────────────────
+export interface NewsCardParams {
+  headlineEn: string;
+  headlineAr: string;
+  captionEn: string;
+  captionAr: string;
+  brandId: string;
+  language: 'en' | 'ar';
+  aspectRatio: string;
+  accentColor: string;
+  disclaimer: string;
+}
+
+export const generateNewsCard = (params: NewsCardParams): Promise<string> =>
+  callAI<{ imageData: string }>('generate-news-card', params).then(d => d.imageData);
+
 // ── Instagram publish (no AI key — uses user-provided access token) ───────────
 export const publishToInstagram = async (
   imageUrl: string,

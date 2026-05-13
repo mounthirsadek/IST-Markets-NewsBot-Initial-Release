@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Zap, Image as ImageIcon, Save, Languages, ChevronLeft, Loader2, AlertCircle, Download, Maximize2, X, Radio, Search, RefreshCw } from 'lucide-react';
-import { generateHookContent, generateStoryImage, generateVisualBrief, StoryContent, ImageProvider } from '../services/geminiService';
+import { Zap, Image as ImageIcon, Save, Languages, ChevronLeft, Loader2, AlertCircle, Download, Maximize2, X, Radio, Search, RefreshCw, Sparkles } from 'lucide-react';
+import { generateHookContent, generateStoryImage, generateVisualBrief, StoryContent, ImageProvider, generateNewsCard } from '../services/geminiService';
 import { fetchWithAuth } from '../lib/api';
 import { useAuthStore } from '../store';
 import { useBrandStore } from '../context/BrandContext';
@@ -148,6 +148,14 @@ export default function HooksEditor() {
   const [mcError, setMcError] = useState<string | null>(null);
   const [mcSuccess, setMcSuccess] = useState(false);
 
+  // ── AI Full Design tab state ─────────────────────────────────────────────────
+  const [previewTab, setPreviewTab] = useState<'classic' | 'ai-design'>('classic');
+  const [aiCardEnUrl, setAiCardEnUrl] = useState('');
+  const [aiCardArUrl, setAiCardArUrl] = useState('');
+  const [aiCardLang, setAiCardLang] = useState<'en' | 'ar'>('en');
+  const [aiCardGenerating, setAiCardGenerating] = useState(false);
+  const [aiCardError, setAiCardError] = useState<string | null>(null);
+
   // ── Load brand settings ─────────────────────────────────────────────────────
   useEffect(() => {
     const brandDefaults: BrandSettings = {
@@ -256,6 +264,66 @@ export default function HooksEditor() {
     link.click();
   };
 
+  // ── Logo compositing for AI Full Design ──────────────────────────────────────
+  const compositeLogoOnCard = async (cardDataUrl: string, logoUrl: string, w: number, h: number): Promise<string> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    await new Promise<void>(res => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { ctx.drawImage(img, 0, 0, w, h); res(); };
+      img.onerror = () => res();
+      img.src = cardDataUrl;
+    });
+    if (logoUrl) {
+      await new Promise<void>(res => {
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        logo.onload = () => {
+          const lh = Math.round(h * 0.045);
+          const lw = Math.round((logo.width / logo.height) * lh);
+          ctx.drawImage(logo, Math.round((w - lw) / 2), Math.round(h * 0.025), lw, lh);
+          res();
+        };
+        logo.onerror = () => res();
+        logo.src = logoUrl;
+      });
+    }
+    return canvas.toDataURL('image/jpeg', 0.92);
+  };
+
+  const handleGenerateAICard = async (lang: 'en' | 'ar') => {
+    if (!enHeadline && !arHeadline) return;
+    setAiCardGenerating(true);
+    setAiCardError(null);
+    try {
+      const fmt = FORMAT_MAP[selectedFormat] ?? FORMAT_MAP['ig-post'];
+      const aspectRatio = activeBrand.id === 'marsad-alsouq' ? '3:4' : fmt.aspectRatio;
+      const w = activeBrand.id === 'marsad-alsouq' ? activeBrand.canvasWidth : fmt.width;
+      const h = activeBrand.id === 'marsad-alsouq' ? activeBrand.canvasHeight : fmt.height;
+      const raw = await generateNewsCard({
+        headlineEn: enHeadline,
+        headlineAr: arHeadline,
+        captionEn: enCaption,
+        captionAr: arCaption,
+        brandId: activeBrand.id,
+        language: lang,
+        aspectRatio,
+        accentColor: brandSettings?.defaultAccentColor || activeBrand.accentColor,
+        disclaimer: brandSettings?.footerDisclaimer || '',
+      });
+      const composited = await compositeLogoOnCard(raw, brandSettings?.logoUrl || '', w, h);
+      if (lang === 'en') setAiCardEnUrl(composited);
+      else setAiCardArUrl(composited);
+    } catch (e: any) {
+      setAiCardError(e.message);
+    } finally {
+      setAiCardGenerating(false);
+    }
+  };
+
   // ── Save story ────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true);
@@ -354,7 +422,9 @@ export default function HooksEditor() {
       setMcError('Select a brand and at least one network.');
       return;
     }
-    const canvasDataUrl = mcLanguage === 'en' ? enBrandedUrl : arBrandedUrl;
+    const classicUrl = mcLanguage === 'en' ? enBrandedUrl : arBrandedUrl;
+    const aiUrl      = mcLanguage === 'en' ? aiCardEnUrl : aiCardArUrl;
+    const canvasDataUrl = (previewTab === 'ai-design' && aiUrl) ? aiUrl : classicUrl;
     const caption = mcLanguage === 'en'
       ? `${enCaption}\n\n${enHashtags.map(h => `#${h.replace('#', '')}`).join(' ')}`
       : `${arCaption}\n\n${arHashtags.map(h => `#${h.replace('#', '')}`).join(' ')}`;
@@ -427,7 +497,7 @@ export default function HooksEditor() {
           </button>
           <button
             onClick={openMetricool}
-            disabled={!enBrandedUrl && !arBrandedUrl}
+            disabled={!enBrandedUrl && !arBrandedUrl && !aiCardEnUrl && !aiCardArUrl}
             className="hidden md:flex px-6 py-2 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 font-bold text-purple-300 transition-all items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Radio size={18} />
@@ -669,8 +739,26 @@ export default function HooksEditor() {
             </select>
           </div>
 
-          {/* Format mismatch warning */}
-          {formatMismatch && (
+          {/* ── Generation Mode Tabs ── */}
+          <div className="flex rounded-xl bg-white/5 p-1 gap-1 border border-white/8">
+            {[
+              { id: 'classic',   label: 'Classic',          icon: <ImageIcon size={12} /> },
+              { id: 'ai-design', label: 'AI Full Design ✨', icon: <Sparkles size={12} /> },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setPreviewTab(tab.id as 'classic' | 'ai-design')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                  previewTab === tab.id ? 'bg-white/12 text-white shadow' : 'text-white/40 hover:text-white/60'
+                }`}
+              >
+                {tab.icon}{tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Format mismatch warning (classic only) */}
+          {previewTab === 'classic' && formatMismatch && (
             <div className="p-3 bg-amber-400/10 border border-amber-400/25 rounded-xl flex items-center gap-3">
               <AlertCircle size={14} className="text-amber-400 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -687,7 +775,93 @@ export default function HooksEditor() {
             </div>
           )}
 
-          <div className="space-y-6">
+          {/* ── AI Full Design Panel ── */}
+          {previewTab === 'ai-design' && (
+            <div className="space-y-4">
+              {/* Language toggle */}
+              <div className="flex gap-2">
+                {(['en', 'ar'] as const).map(lang => (
+                  <button
+                    key={lang}
+                    onClick={() => setAiCardLang(lang)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${
+                      aiCardLang === lang
+                        ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-400'
+                        : 'bg-white/5 border-white/10 text-white/40 hover:text-white/60'
+                    }`}
+                  >
+                    {lang === 'en' ? '🇬🇧 English' : '🇸🇦 Arabic'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Generate button */}
+              <button
+                onClick={() => handleGenerateAICard(aiCardLang)}
+                disabled={aiCardGenerating || (!enHeadline && !arHeadline)}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-sm font-bold flex items-center justify-center gap-2 hover:from-purple-500/30 hover:to-pink-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {aiCardGenerating
+                  ? <><Loader2 className="animate-spin" size={15} /> GPT Image designing…</>
+                  : <><Sparkles size={15} /> Generate AI Card ({aiCardLang.toUpperCase()})</>
+                }
+              </button>
+
+              {aiCardError && (
+                <div className="p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle size={12} /><span>{aiCardError}</span>
+                </div>
+              )}
+
+              {aiCardEnUrl && (
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-white/40">AI Card — English</label>
+                  <div className="w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                    <img src={aiCardEnUrl} className="w-full" alt="AI Card EN" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setPreviewModal(aiCardEnUrl)} className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all">
+                      <Maximize2 size={12} /> Preview
+                    </button>
+                    <button onClick={() => handleDownload(aiCardEnUrl, 'AI-EN')} className="flex-1 py-2 rounded-lg bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 text-[10px] font-bold uppercase tracking-wider text-yellow-400 flex items-center justify-center gap-1.5 transition-all">
+                      <Download size={12} /> Download EN
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {aiCardArUrl && (
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-white/40">AI Card — Arabic</label>
+                  <div className="w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                    <img src={aiCardArUrl} className="w-full" alt="AI Card AR" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setPreviewModal(aiCardArUrl)} className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all">
+                      <Maximize2 size={12} /> Preview
+                    </button>
+                    <button onClick={() => handleDownload(aiCardArUrl, 'AI-AR')} className="flex-1 py-2 rounded-lg bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 text-[10px] font-bold uppercase tracking-wider text-yellow-400 flex items-center justify-center gap-1.5 transition-all">
+                      <Download size={12} /> Download AR
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(aiCardEnUrl || aiCardArUrl) && (
+                <button onClick={openMetricool} className="w-full py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 font-bold text-purple-300 text-xs flex items-center justify-center gap-2 transition-all">
+                  <Radio size={14} /> Send to Metricool
+                </button>
+              )}
+
+              {(!enHeadline && !arHeadline) && (
+                <p className="text-center text-[10px] text-white/30 uppercase tracking-widest py-4">
+                  Generate hook content first (center panel)
+                </p>
+              )}
+            </div>
+          )}
+
+          {previewTab === 'classic' && <div className="space-y-6">
             {/* English Branded Preview */}
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest text-white/40">English · {dims.platform} {dims.label}</label>
@@ -848,7 +1022,7 @@ export default function HooksEditor() {
                 <p>{imageError}</p>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 

@@ -736,6 +736,83 @@ async function startServer() {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── AI Full Design — GPT Image-1 designs the entire news card ────────────────
+  app.post('/api/ai/generate-news-card', checkAuth, async (req: any, res: any) => {
+    try {
+      const { headlineEn, headlineAr, captionEn, captionAr, brandId, language, aspectRatio = '1:1', accentColor, disclaimer } = req.body;
+      if (!headlineEn && !headlineAr) return res.status(400).json({ error: 'Missing headline' });
+      if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
+
+      const size = OPENAI_SIZE_MAP[aspectRatio] ?? '1024x1024';
+      const [w, h] = size.split('x').map(Number);
+
+      let brandPrompt = '';
+
+      if (brandId === 'marsad-alsouq') {
+        // ── Marsad Al Souq — Navy/Gold Luxury Arabic card ────────────────────
+        const headline = language === 'en' ? headlineEn : headlineAr;
+        const caption  = language === 'en' ? captionEn  : captionAr;
+        const isRTL    = language !== 'en';
+        brandPrompt = `Professional Arabic financial news intelligence card. Luxury Arabian finance aesthetics.
+
+CANVAS: ${w}×${h}px
+BACKGROUND: Deep navy gradient (#0D1B2A top to #070E1A bottom). Subtle gold geometric lattice pattern at 4% opacity. Soft gold radial glow top-right at 12% opacity. Dark angular depth shapes bottom-left.
+TOP ZONE (top 12% of canvas): Clean navy background only — completely empty, reserved for logo overlay. At the very bottom of this zone: thin full-width gold gradient separator line (#C9A84C, fading gently at edges). Absolutely no text, no icons in this zone.
+CONTENT ZONE (middle 68%):
+  - Upper portion: Cinematic photorealistic scene representing the financial news topic: "${caption}". Rich, dramatic lighting. Fades smoothly into navy below via gradient.
+  - Lower portion over navy background:
+    - ${isRTL ? 'RTL layout, Arabic typography, right-to-left reading order.' : 'LTR layout, clean English typography.'}
+    - Breaking news badge pill: gold border, gold text saying "${isRTL ? 'خبر عاجل' : 'BREAKING NEWS'}", dark fill, ${isRTL ? 'right-aligned.' : 'left-aligned.'}
+    - HOOK HEADLINE: "${headline}" — ultra-bold ${isRTL ? 'Arabic (Cairo 900)' : 'sans-serif'} font, white text, ${isRTL ? 'right-aligned, last line in gold (#C9A84C).' : 'left-aligned, dramatic.'}
+    - 6px × 80px solid gold bar ${isRTL ? 'right-aligned' : 'center-aligned'} below headline
+    - Subtext: 1 concise line in 60% white, smaller font, ${isRTL ? 'right-aligned Arabic' : 'left-aligned English'}
+FOOTER ZONE (bottom 10%):
+  - Full-width thin gold (#C9A84C) separator line
+  - Disclaimer text (very small, 50% white): "${disclaimer || 'التداول ينطوي على مخاطر. الأداء السابق لا يضمن النتائج المستقبلية.'}" — center-aligned
+  - "بدعم من IST Markets" in very faint white (15% opacity), center, tiny font
+ACCENT COLOR: #${(accentColor || 'C9A84C').replace('#', '')} for all decorative elements
+STYLE: Luxury magazine editorial meets institutional intelligence. No cheap effects. Premium, measured composition. No clutter. Purposeful whitespace.`;
+      } else {
+        // ── IST Markets — Dark/Orange Bloomberg-style card ───────────────────
+        const headline = language === 'ar' ? headlineAr : headlineEn;
+        const caption  = language === 'ar' ? captionAr  : captionEn;
+        const isRTL    = language === 'ar';
+        brandPrompt = `Professional financial news broadcast card. Ultra-modern Bloomberg-meets-editorial style.
+
+CANVAS: ${w}×${h}px
+BACKGROUND: Deep near-black (#111114) base with very subtle diagonal precision-grid mesh at 2% opacity. No real charts. Dark, authoritative, premium.
+TOP ZONE (top 12% of canvas): Pure clean dark background only — completely empty, reserved for logo overlay. At the very bottom of this zone: a 2px horizontal orange (#f27d26) line spanning the full canvas width. Absolutely no text or elements in this zone.
+CONTENT ZONE (middle 68%):
+  - Upper portion: Photorealistic cinematic hero image representing: "${caption}". Shot style: dramatic lighting, cinematic depth. Fades to dark at bottom via gradient.
+  - Lower portion over dark background:
+    - News label pill: small rounded badge "${isRTL ? 'خبر عاجل' : 'BREAKING'}" in orange (#f27d26), uppercase, ${isRTL ? 'right-aligned.' : 'top-left.'}
+    - HOOK HEADLINE: "${headline}" — ultra-bold uppercase ${isRTL ? 'Arabic (Cairo 900)' : 'sans-serif'}, white text, ${isRTL ? 'right-aligned' : 'center-aligned'}, 3-4 lines max, dramatic weight
+    - Thin 4px × 60px orange bar ${isRTL ? 'right-aligned' : 'centered'} below headline
+    - Subtext: Short 1-line description in 60% white, smaller font, ${isRTL ? 'right-aligned Arabic' : 'centered English'}
+FOOTER ZONE (bottom 10%):
+  - Full-width 1px orange (#f27d26) separator line
+  - Disclaimer text (very small, 50% gray): "${disclaimer || 'Trading involves risk. Past performance is not indicative of future results.'}"
+  - "IST MARKETS" in faint gray (15% opacity), center watermark, tiny
+ACCENT COLOR: #${(accentColor || 'f27d26').replace('#', '')} throughout (borders, pills, bars)
+STYLE: Clean, high-contrast, editorial. Professional. No clutter. White space used purposefully. No logos — top zone must remain empty.`;
+      }
+
+      const response = await openai.images.generate({
+        model: 'gpt-image-1',
+        prompt: brandPrompt,
+        n: 1,
+        size,
+        quality: 'high',
+      } as any);
+
+      const b64 = (response.data as any)?.[0]?.b64_json;
+      if (!b64) throw new Error('No image returned from OpenAI');
+
+      await logAction(req.user.id, 'GENERATE_AI_CARD', 'story', null, `Brand: ${brandId}, Lang: ${language}`);
+      res.json({ imageData: `data:image/png;base64,${b64}` });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   app.post('/api/ai/social-caption', checkAuth, async (req: any, res: any) => {
     try {
       const { headline, caption } = req.body;
