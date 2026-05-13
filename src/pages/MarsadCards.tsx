@@ -58,6 +58,131 @@ const TABS: { id: CardType; label: string; icon: typeof Zap; color: string }[] =
   { id: 'webinar',         label: 'Webinar',           icon: Radio,      color: '#A855F7' },
 ];
 
+// ── Professional caption generator ───────────────────────────────────────────
+function generateCardCaption(
+  lang: 'ar' | 'en',
+  tab: CardType,
+  signal: SignalData,
+  calendar: CalendarData,
+  pot: ProofOfTradesData,
+  webinar: WebinarData
+): string {
+  if (tab === 'signal') {
+    const dirAr = signal.direction === 'BUY' ? 'شراء 🟢' : 'بيع 🔴';
+    if (lang === 'ar') return [
+      `🔔 إشارة تداول | ${signal.pair}`,
+      ``,
+      `📍 الاتجاه: ${dirAr}`,
+      `💰 الدخول: ${signal.entry || '—'}`,
+      `🛑 وقف الخسارة: ${signal.stopLoss || '—'}`,
+      `🎯 الهدف: ${signal.takeProfit || '—'}`,
+      `📊 نسبة المخاطرة: ${signal.rrRatio}`,
+      signal.setupNotes ? `\n💬 ${signal.setupNotes}` : '',
+      ``,
+      `#مرصد_السوق #إشارات_تداول #${signal.pair} #فوركس #تداول`,
+    ].filter(l => l !== null).join('\n');
+
+    return [
+      `🔔 Trading Signal | ${signal.pair}`,
+      ``,
+      `📍 Direction: ${signal.direction === 'BUY' ? 'BUY 🟢' : 'SELL 🔴'}`,
+      `💰 Entry: ${signal.entry || '—'}`,
+      `🛑 Stop Loss: ${signal.stopLoss || '—'}`,
+      `🎯 Take Profit: ${signal.takeProfit || '—'}`,
+      `📊 Risk:Reward: ${signal.rrRatio}`,
+      signal.setupNotes ? `\n💬 ${signal.setupNotes}` : '',
+      ``,
+      `#MarsadAlSouq #TradingSignal #${signal.pair} #Forex #Trading`,
+    ].filter(l => l !== null).join('\n');
+  }
+
+  if (tab === 'calendar') {
+    const highCount = calendar.events.filter(e => e.impact === 'high').length;
+    if (lang === 'ar') return [
+      `📅 الأجندة الاقتصادية`,
+      ``,
+      calendar.date ? `📆 ${new Date(calendar.date + 'T00:00:00').toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}` : '',
+      highCount > 0 ? `⚠️ ${highCount} حدث عالي التأثير اليوم` : '',
+      ``,
+      `تابعوا أبرز الأحداث الاقتصادية المؤثرة على الأسواق العالمية مع مرصد السوق 🎯`,
+      ``,
+      `#مرصد_السوق #التقويم_الاقتصادي #اخبار_الفوركس #تداول #أسواق_مالية`,
+    ].filter(Boolean).join('\n');
+
+    return [
+      `📅 Economic Calendar`,
+      ``,
+      calendar.date ? `📆 ${new Date(calendar.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}` : '',
+      highCount > 0 ? `⚠️ ${highCount} high-impact event${highCount > 1 ? 's' : ''} today` : '',
+      ``,
+      `Stay ahead of market-moving events with Marsad Al Souq 🎯`,
+      ``,
+      `#MarsadAlSouq #EconomicCalendar #ForexNews #Trading #FinancialMarkets`,
+    ].filter(Boolean).join('\n');
+  }
+
+  if (tab === 'proof-of-trades') {
+    const profitStr = (pot.totalProfit >= 0 ? '+' : '') + pot.totalProfit.toFixed(2);
+    if (lang === 'ar') return [
+      `✅ إثبات الصفقات${pot.period ? ' | ' + pot.period : ''}`,
+      ``,
+      `💼 إجمالي الأرباح: ${profitStr} $`,
+      `🔢 عدد الصفقات: ${pot.trades.length}`,
+      ``,
+      `النتائج تتكلم عن نفسها 📈`,
+      `شفافية تامة وأداء موثق مع مرصد السوق`,
+      ``,
+      `#مرصد_السوق #إثبات_الصفقات #نتائج_موثقة #تداول #فوركس`,
+    ].join('\n');
+
+    return [
+      `✅ Proof of Trades${pot.period ? ' | ' + pot.period : ''}`,
+      ``,
+      `💼 Total P&L: ${profitStr} $`,
+      `🔢 Number of trades: ${pot.trades.length}`,
+      ``,
+      `Results speak for themselves 📈`,
+      `Full transparency & documented performance with Marsad Al Souq`,
+      ``,
+      `#MarsadAlSouq #ProofOfTrades #TradingResults #Verified #Forex`,
+    ].join('\n');
+  }
+
+  if (tab === 'webinar') {
+    if (lang === 'ar') return [
+      `🎙️ ندوة مباشرة`,
+      ``,
+      webinar.title || 'ندوة تداول',
+      ``,
+      webinar.dateAr ? `📅 ${webinar.dateAr}` : '',
+      webinar.timeAr ? `🕐 ${webinar.timeAr}` : '',
+      `📱 ${webinar.platform}`,
+      ``,
+      `سجّل الآن مجاناً 👇`,
+      webinar.bookingUrl || '',
+      ``,
+      `#مرصد_السوق #ندوة_مباشرة #تعليم_تداول #فوركس #تداول`,
+    ].filter(Boolean).join('\n');
+
+    return [
+      `🎙️ Live Webinar`,
+      ``,
+      webinar.title || 'Trading Webinar',
+      ``,
+      webinar.dateAr ? `📅 ${webinar.dateAr}` : '',
+      webinar.timeAr ? `🕐 ${webinar.timeAr}` : '',
+      `📱 ${webinar.platform}`,
+      ``,
+      `Register now for free 👇`,
+      webinar.bookingUrl || '',
+      ``,
+      `#MarsadAlSouq #LiveWebinar #TradingEducation #Forex #Trading`,
+    ].filter(Boolean).join('\n');
+  }
+
+  return '';
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function MarsadCards() {
   const { activeBrand } = useBrandStore();
@@ -65,7 +190,6 @@ export default function MarsadCards() {
 
   const [activeTab, setActiveTab]   = useState<CardType>('signal');
   const [brandSettings, setBrandSettings] = useState<any>({});
-  const [cardDataUrl, setCardDataUrl]      = useState<string>('');
   const [publishing, setPublishing]        = useState(false);
 
   // Per-tab data
@@ -101,6 +225,20 @@ export default function MarsadCards() {
   const [mcSuccess, setMcSuccess]                   = useState(false);
   const [mcError, setMcError]                       = useState('');
   const [mcScheduledAt, setMcScheduledAt]           = useState('');
+
+  // ── Dual-language preview ────────────────────────────────────────────────────
+  const [arDataUrl, setArDataUrl] = useState<string>('');
+  const [enDataUrl, setEnDataUrl] = useState<string>('');
+
+  // ── Captions (auto-generated, user-editable) ─────────────────────────────────
+  const [arCaption, setArCaption] = useState<string>('');
+  const [enCaption, setEnCaption] = useState<string>('');
+
+  // ── Publish language selection ───────────────────────────────────────────────
+  const [publishLang, setPublishLang] = useState<'ar' | 'en'>('ar');
+
+  // ── Telegram language modal ──────────────────────────────────────────────────
+  const [tgLangModalOpen, setTgLangModalOpen] = useState(false);
 
   // ── Load brand settings ── fetch both Marsad and IST Markets; use IST logo
   // as fallback when Marsad brand settings haven't been configured yet
@@ -298,83 +436,75 @@ export default function MarsadCards() {
     return () => clearTimeout(timeout);
   }, [webinar.bookingUrl]);
 
-  // ── Active image URL: AI-generated wins over canvas export ──────────────
-  const activeImageUrl = (activeTab === 'webinar' && aiWebinarImage) ? aiWebinarImage : cardDataUrl;
+  // ── Auto-generate captions when card data or tab changes ─────────────────
+  useEffect(() => {
+    setArCaption(generateCardCaption('ar', activeTab, signal, calendar, pot, webinar));
+    setEnCaption(generateCardCaption('en', activeTab, signal, calendar, pot, webinar));
+  }, [activeTab, signal.pair, signal.direction, signal.entry, signal.stopLoss, signal.takeProfit, signal.rrRatio, signal.setupNotes,
+      calendar.date, calendar.events.length,
+      pot.period, pot.totalProfit, pot.trades.length,
+      webinar.title, webinar.dateAr, webinar.timeAr, webinar.platform, webinar.bookingUrl]);
+
+  // ── Active image URL per language ─────────────────────────────────────────
+  const activeArImageUrl = (activeTab === 'webinar' && aiWebinarImage) ? aiWebinarImage : arDataUrl;
+  const activeEnImageUrl = (activeTab === 'webinar' && aiWebinarImage) ? aiWebinarImage : enDataUrl;
+  const activeImageUrl   = publishLang === 'en' ? activeEnImageUrl : activeArImageUrl;
 
   // ── Download PNG ──────────────────────────────────────────────────────────
   const handleDownload = useCallback(async () => {
-    if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
     const ts = Date.now();
-    const cardData = activeTab === 'signal' ? signal
-      : activeTab === 'calendar' ? calendar
-      : activeTab === 'proof-of-trades' ? pot
-      : webinar;
+    let downloaded = 0;
 
-    // Download Arabic version
-    try {
-      const arUrl = await renderMarsadCardToDataUrl(
-        activeTab, cardData, 'ar',
-        activeBrand.canvasWidth, activeBrand.canvasHeight,
-        brandSettings.logoUrl || '', brandSettings.fixedTagline || '', brandSettings.footerDisclaimer || ''
-      );
-      const aAr = document.createElement('a');
-      aAr.href = arUrl;
-      aAr.download = `marsad-${activeTab}-AR-${ts}.png`;
-      aAr.click();
-    } catch (e) { /* ignore */ }
+    if (arDataUrl) {
+      const a = document.createElement('a');
+      a.href = arDataUrl;
+      a.download = `marsad-${activeTab}-AR-${ts}.png`;
+      a.click();
+      downloaded++;
+    }
 
-    // Small delay then download English version
-    await new Promise(r => setTimeout(r, 400));
+    if (enDataUrl) {
+      await new Promise(r => setTimeout(r, 350));
+      const a = document.createElement('a');
+      a.href = enDataUrl;
+      a.download = `marsad-${activeTab}-EN-${ts}.png`;
+      a.click();
+      downloaded++;
+    }
 
-    try {
-      const enUrl = await renderMarsadCardToDataUrl(
-        activeTab, cardData, 'en',
-        activeBrand.canvasWidth, activeBrand.canvasHeight,
-        brandSettings.logoUrl || '', brandSettings.fixedTagline || '', brandSettings.footerDisclaimer || ''
-      );
-      const aEn = document.createElement('a');
-      aEn.href = enUrl;
-      aEn.download = `marsad-${activeTab}-EN-${ts}.png`;
-      aEn.click();
-    } catch (e) { /* ignore */ }
-
-    showToast('success', 'Downloaded Arabic + English versions ✓');
-  }, [activeImageUrl, activeTab, signal, calendar, pot, webinar, activeBrand, brandSettings, showToast]);
+    if (downloaded === 0) {
+      showToast('info', 'Waiting for cards to render…');
+    } else {
+      showToast('success', `Downloaded ${downloaded === 2 ? 'Arabic + English versions' : (arDataUrl ? 'Arabic' : 'English') + ' version'} ✓`);
+    }
+  }, [arDataUrl, enDataUrl, activeTab, showToast]);
 
   // ── Publish to Telegram ───────────────────────────────────────────────────
   const handlePublish = useCallback(async () => {
-    if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
+    const imgUrl = publishLang === 'en' ? activeEnImageUrl : activeArImageUrl;
+    const caption = publishLang === 'en' ? enCaption : arCaption;
+    if (!imgUrl) return showToast('info', 'Waiting for card to render…');
     setPublishing(true);
+    setTgLangModalOpen(false);
     try {
-      // Convert data URL → blob → upload
-      const blob = await (await fetch(activeImageUrl)).blob();
+      const blob = await (await fetch(imgUrl)).blob();
       const form = new FormData();
-      form.append('file', blob, `marsad-${activeTab}.jpg`);
-
+      form.append('file', blob, `marsad-${activeTab}-${publishLang}.jpg`);
       const upRes = await fetchWithAuth('/api/upload-brand-asset', { method: 'POST', body: form, headers: {} as any });
       if (!upRes.ok) throw new Error('Failed to upload image');
       const { url } = await upRes.json();
-
-      const caption = activeTab === 'signal'
-        ? `${signal.pair} ${signal.direction}\nEntry: ${signal.entry}  |  SL: ${signal.stopLoss}  |  TP: ${signal.takeProfit}\nR:R: ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}`
-        : activeTab === 'calendar'
-          ? `Economic Calendar — ${calendar.date}`
-          : activeTab === 'proof-of-trades'
-            ? `Proof of Trades — ${pot.period}\nTotal: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit} $`
-            : `${webinar.title}\n${webinar.dateAr}  |  ${webinar.timeAr}\n${webinar.bookingUrl}`;
-
       const tgRes = await fetchWithAuth('/api/telegram/send', {
         method: 'POST',
         body: JSON.stringify({ imageUrl: url, caption, brandId: activeBrand.id }),
       });
       if (!tgRes.ok) throw new Error((await tgRes.json()).error);
-      showToast('success', 'Posted to Telegram ✓');
+      showToast('success', `Posted ${publishLang.toUpperCase()} version to Telegram ✓`);
     } catch (e: any) {
       showToast('error', e.message);
     } finally {
       setPublishing(false);
     }
-  }, [cardDataUrl, activeTab, signal, calendar, pot, webinar, activeBrand.id, showToast]);
+  }, [activeArImageUrl, activeEnImageUrl, arCaption, enCaption, publishLang, activeTab, activeBrand.id, showToast]);
 
   // ── Image file → base64 ───────────────────────────────────────────────────
   const fileToBase64 = (file: File): Promise<string> =>
@@ -386,7 +516,7 @@ export default function MarsadCards() {
 
   // ── Metricool helpers ────────────────────────────────────────────────────────
   const openMetricool = async () => {
-    if (!activeImageUrl) return showToast('info', 'Waiting for card to render…');
+    if (!activeArImageUrl && !activeEnImageUrl) return showToast('info', 'Waiting for card to render…');
     setMetricoolOpen(true);
     setMcSuccess(false);
     setMcError('');
@@ -430,17 +560,13 @@ export default function MarsadCards() {
 
   const handleMetricoolSend = async () => {
     if (!mcSelectedBrand || mcSelectedNetworks.length === 0) return;
+    const imgUrl = publishLang === 'en' ? activeEnImageUrl : activeArImageUrl;
+    const caption = publishLang === 'en' ? enCaption : arCaption;
+    if (!imgUrl) { setMcError('Card not yet rendered. Please wait.'); return; }
     setMcLoading(true);
     setMcError('');
     try {
-      const imageUrl = await uploadForMetricool(activeImageUrl);
-      const caption = activeTab === 'signal'
-        ? `${signal.pair} ${signal.direction} | Entry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit} | R:R ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}\n\n#MarsadAlSouq #TradingSignal #${signal.pair}`
-        : activeTab === 'calendar'
-        ? `Economic Calendar — ${calendar.date}\n\n#MarsadAlSouq #EconomicCalendar #ForexNews`
-        : activeTab === 'proof-of-trades'
-        ? `Proof of Trades — ${pot.period}\nTotal P&L: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit}$\n\n#MarsadAlSouq #ProofOfTrades #Results`
-        : `${webinar.title}\n${webinar.dateAr} | ${webinar.timeAr}\n${webinar.bookingUrl}\n\n#MarsadAlSouq #Webinar`;
+      const imageUrl = await uploadForMetricool(imgUrl);
       await scheduleToMetricool({
         blogId: mcSelectedBrand.id,
         networks: mcSelectedNetworks,
@@ -1141,7 +1267,7 @@ export default function MarsadCards() {
               <Radio size={14} />
               Metricool
             </button>
-            <button onClick={handlePublish} disabled={publishing}
+            <button onClick={() => setTgLangModalOpen(true)} disabled={publishing}
               style={{ backgroundColor: accent + '20', borderColor: accent + '60', color: accent }}
               className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium border transition-all hover:opacity-80 disabled:opacity-50">
               <Send size={14} />
@@ -1150,75 +1276,98 @@ export default function MarsadCards() {
           </div>
         </div>
 
-        {/* ── Preview panel ───────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-8 px-4 bg-[#060606]">
-          {/* Header row: label + AI badge */}
-          <div className="mb-4 flex items-center gap-3">
-            <span className="text-xs text-white/25 font-mono tracking-wide">Card Preview • 1080 × 1350</span>
-            {activeTab === 'webinar' && aiWebinarImage && (
-              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
-                style={{ background: 'linear-gradient(90deg,#5b21b6,#9333ea)', color: '#f3e8ff' }}>
-                <Sparkles size={10} /> AI Design
-              </span>
-            )}
-            {activeTab === 'webinar' && generatingWebinar && (
-              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-white/5 text-white/40 border border-white/10">
-                <div className="w-3 h-3 rounded-full border border-white/30 border-t-white/60 animate-spin" />
-                Generating…
-              </span>
-            )}
+        {/* ── Preview panel — split AR / EN ──────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto bg-[#060606] py-6 px-4">
+          <div className="flex gap-5 justify-center min-w-0 flex-wrap xl:flex-nowrap">
+
+            {/* ── Arabic preview ─────────────────────────────────────────── */}
+            <div className="flex flex-col items-center gap-3 min-w-0" style={{ maxWidth: 320 }}>
+              {/* Header */}
+              <div className="flex items-center gap-2 self-stretch justify-between">
+                <span className="text-[10px] font-mono text-white/25 tracking-wide">AR · عربي</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#C9A84C]/15 text-[#C9A84C] border border-[#C9A84C]/25">
+                  1080 × 1350
+                </span>
+              </div>
+
+              {/* Card image */}
+              {activeTab === 'webinar' && aiWebinarImage ? (
+                <img src={aiWebinarImage} alt="AR Webinar" className="rounded-2xl shadow-2xl border border-[#C9A84C]/20 w-full" />
+              ) : arDataUrl ? (
+                <img src={arDataUrl} alt="AR Card" className="rounded-2xl shadow-2xl border border-[#C9A84C]/20 w-full" />
+              ) : (
+                <div className="rounded-2xl bg-[#0D1B2A] border border-white/10 flex items-center justify-center w-full"
+                  style={{ aspectRatio: '1080/1350' }}>
+                  <div className="flex flex-col items-center gap-2 text-white/25">
+                    <div className="animate-spin rounded-full h-7 w-7 border-t-2 border-[#C9A84C]" />
+                    <p className="text-xs">Rendering AR…</p>
+                  </div>
+                </div>
+              )}
+
+              {/* AR Caption editor */}
+              <div className="w-full space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] uppercase tracking-widest text-white/35">Arabic Caption</label>
+                  <button onClick={() => setArCaption(generateCardCaption('ar', activeTab, signal, calendar, pot, webinar))}
+                    className="text-[9px] text-[#C9A84C]/60 hover:text-[#C9A84C] transition-colors">↺ Reset</button>
+                </div>
+                <textarea
+                  value={arCaption}
+                  onChange={e => setArCaption(e.target.value)}
+                  rows={8}
+                  dir="rtl"
+                  className="w-full bg-white/4 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white/75 leading-relaxed resize-none focus:outline-none focus:border-[#C9A84C]/50 font-['Cairo',sans-serif]"
+                  placeholder="سيتم توليد الكابشن تلقائياً…"
+                />
+              </div>
+            </div>
+
+            {/* ── English preview ─────────────────────────────────────────── */}
+            <div className="flex flex-col items-center gap-3 min-w-0" style={{ maxWidth: 320 }}>
+              {/* Header */}
+              <div className="flex items-center gap-2 self-stretch justify-between">
+                <span className="text-[10px] font-mono text-white/25 tracking-wide">EN · English</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/25">
+                  1080 × 1350
+                </span>
+              </div>
+
+              {/* Card image */}
+              {activeTab === 'webinar' && aiWebinarImage ? (
+                <img src={aiWebinarImage} alt="EN Webinar" className="rounded-2xl shadow-2xl border border-blue-500/20 w-full" />
+              ) : enDataUrl ? (
+                <img src={enDataUrl} alt="EN Card" className="rounded-2xl shadow-2xl border border-blue-500/20 w-full" />
+              ) : (
+                <div className="rounded-2xl bg-[#0D1B2A] border border-white/10 flex items-center justify-center w-full"
+                  style={{ aspectRatio: '1080/1350' }}>
+                  <div className="flex flex-col items-center gap-2 text-white/25">
+                    <div className="animate-spin rounded-full h-7 w-7 border-t-2 border-blue-500" />
+                    <p className="text-xs">Rendering EN…</p>
+                  </div>
+                </div>
+              )}
+
+              {/* EN Caption editor */}
+              <div className="w-full space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] uppercase tracking-widest text-white/35">English Caption</label>
+                  <button onClick={() => setEnCaption(generateCardCaption('en', activeTab, signal, calendar, pot, webinar))}
+                    className="text-[9px] text-blue-400/60 hover:text-blue-400 transition-colors">↺ Reset</button>
+                </div>
+                <textarea
+                  value={enCaption}
+                  onChange={e => setEnCaption(e.target.value)}
+                  rows={8}
+                  className="w-full bg-white/4 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white/75 leading-relaxed resize-none focus:outline-none focus:border-blue-500/50"
+                  placeholder="Caption will be auto-generated…"
+                />
+              </div>
+            </div>
+
           </div>
-
-          {/* Preview image */}
-          {activeTab === 'webinar' && aiWebinarImage ? (
-            <img
-              src={aiWebinarImage}
-              alt="AI Webinar Design"
-              className="rounded-2xl shadow-2xl"
-              style={{
-                maxHeight: 'calc(100vh - 160px)', maxWidth: '100%', width: 'auto', objectFit: 'contain',
-                border: '1px solid #7c3aed60',
-                boxShadow: '0 0 40px #7c3aed30',
-              }}
-            />
-          ) : activeTab === 'webinar' && generatingWebinar ? (
-            <div
-              className="flex items-center justify-center rounded-2xl border"
-              style={{
-                width: PREVIEW_W, height: Math.round(PREVIEW_W * (1350 / 1080)),
-                background: 'linear-gradient(180deg,#2e1065,#1e1035)',
-                borderColor: '#7c3aed40',
-              }}
-            >
-              <div className="flex flex-col items-center gap-4 text-purple-300">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-[#a855f7]" />
-                <p className="text-sm font-medium">GPT Image designing…</p>
-                <p className="text-xs text-purple-400/60">May take up to a minute</p>
-              </div>
-            </div>
-          ) : cardDataUrl ? (
-            <img
-              src={cardDataUrl}
-              alt="Card Preview"
-              className="rounded-2xl shadow-2xl border border-white/10"
-              style={{ maxHeight: 'calc(100vh - 160px)', maxWidth: '100%', width: 'auto', objectFit: 'contain' }}
-            />
-          ) : (
-            <div
-              className="flex items-center justify-center rounded-2xl bg-[#0D1B2A] border border-white/10"
-              style={{ width: PREVIEW_W, height: Math.round(PREVIEW_W * (1350 / 1080)) }}
-            >
-              <div className="flex flex-col items-center gap-3 text-white/30">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#C9A84C]" />
-                <p className="text-sm">Rendering card…</p>
-              </div>
-            </div>
-          )}
-
-          <p className="mt-4 text-xs text-white/20 text-center max-w-[300px]">
-            {activeTab === 'webinar' && aiWebinarImage
-              ? "AI design active — click 'Cancel AI Design' to revert"
-              : 'Card updates automatically as you edit'}
+          <p className="mt-5 text-xs text-white/15 text-center">
+            Cards update automatically as you edit · Captions are editable
           </p>
         </div>
       </div>
@@ -1253,6 +1402,23 @@ export default function MarsadCards() {
               </div>
             ) : (
               <>
+                {/* Language selector */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-white/40">Card Language</label>
+                  <div className="flex gap-2">
+                    {(['ar', 'en'] as const).map(l => (
+                      <button key={l} onClick={() => setPublishLang(l)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${
+                          publishLang === l
+                            ? l === 'ar' ? 'bg-[#C9A84C]/20 border-[#C9A84C]/60 text-[#C9A84C]' : 'bg-blue-500/20 border-blue-500/60 text-blue-300'
+                            : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                        }`}>
+                        {l === 'ar' ? '🇸🇦 Arabic' : '🇬🇧 English'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {mcBrands.length > 0 && (
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest text-white/40">Brand</label>
@@ -1286,15 +1452,9 @@ export default function MarsadCards() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest text-white/40">Caption Preview</label>
-                  <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-xs text-white/60 leading-relaxed max-h-24 overflow-y-auto" dir="ltr">
-                    {activeTab === 'signal'
-                      ? `${signal.pair} ${signal.direction} | Entry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit} | R:R ${signal.rrRatio}${signal.setupNotes ? '\n' + signal.setupNotes : ''}`
-                      : activeTab === 'calendar'
-                      ? `Economic Calendar — ${calendar.date}`
-                      : activeTab === 'proof-of-trades'
-                      ? `Proof of Trades — ${pot.period} | Total: ${pot.totalProfit >= 0 ? '+' : ''}${pot.totalProfit}$`
-                      : `${webinar.title}\n${webinar.dateAr} | ${webinar.timeAr}`
-                    }
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-xs text-white/70 leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap"
+                    dir={publishLang === 'ar' ? 'rtl' : 'ltr'}>
+                    {publishLang === 'ar' ? arCaption : enCaption}
                   </div>
                 </div>
 
@@ -1326,34 +1486,88 @@ export default function MarsadCards() {
         </div>
       )}
 
-      {/* ── Off-screen canvas ── renders at full resolution, invisible to user ── */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed', left: '-9999px', top: '-9999px',
-          width: 1080, height: 1350,
-          opacity: 0, pointerEvents: 'none', zIndex: -1,
-        }}
-      >
+      {/* ── Telegram language picker modal ──────────────────────────────────── */}
+      {tgLangModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setTgLangModalOpen(false)}>
+          <div className="glass rounded-2xl w-full max-w-sm p-7 space-y-5 border border-[#C9A84C]/20 shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Send size={18} className="text-[#C9A84C]" />
+                <h3 className="font-bold text-base tracking-tight">Send to Telegram</h3>
+              </div>
+              <button onClick={() => setTgLangModalOpen(false)} className="p-1.5 hover:bg-white/10 rounded-lg">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-white/40">Select Card Language</label>
+              <div className="flex gap-3">
+                {(['ar', 'en'] as const).map(l => (
+                  <button key={l} onClick={() => setPublishLang(l)}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all border ${
+                      publishLang === l
+                        ? l === 'ar' ? 'bg-[#C9A84C]/20 border-[#C9A84C]/60 text-[#C9A84C]' : 'bg-blue-500/20 border-blue-500/60 text-blue-300'
+                        : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                    }`}>
+                    {l === 'ar' ? '🇸🇦 Arabic' : '🇬🇧 English'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest text-white/40">Caption Preview</label>
+              <div className="bg-white/5 border border-white/8 rounded-xl p-3 text-xs text-white/65 leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap"
+                dir={publishLang === 'ar' ? 'rtl' : 'ltr'}>
+                {publishLang === 'ar' ? arCaption : enCaption}
+              </div>
+            </div>
+
+            <button onClick={handlePublish} disabled={publishing}
+              className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              style={{ backgroundColor: '#C9A84C20', borderColor: '#C9A84C60', border: '1px solid', color: '#C9A84C' }}>
+              {publishing
+                ? <><div className="w-4 h-4 rounded-full border-2 border-[#C9A84C] border-t-transparent animate-spin" /> Posting…</>
+                : <><Send size={15} /> Send {publishLang === 'ar' ? 'Arabic' : 'English'} Card</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Off-screen canvases — AR + EN, invisible, render at full 1080×1350 ── */}
+      <div aria-hidden="true" style={{ position: 'fixed', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+        {/* Arabic version */}
         <BrandedCanvas
-          backgroundImage={null}
-          storyImage={null}
-          headline=""
+          backgroundImage={null} storyImage={null} headline=""
           accentColor={activeBrand.accentColor}
           logoUrl={brandSettings?.logoUrl || ''}
           tagline={brandSettings?.fixedTagline || ''}
           disclaimer={brandSettings?.footerDisclaimer || ''}
           language="ar"
-          width={1080}
-          height={1350}
+          width={1080} height={1350}
           brandId="marsad-alsouq"
           cardType={activeTab}
-          cardData={
-            activeTab === 'calendar'
-              ? { ...calendar, events: calendar.events.filter(e => !(e as any)._hidden) }
-              : currentCardData
-          }
-          onExport={setCardDataUrl}
+          cardLang="ar"
+          cardData={activeTab === 'calendar' ? { ...calendar, events: calendar.events.filter(e => !(e as any)._hidden) } : currentCardData}
+          onExport={setArDataUrl}
+        />
+        {/* English version */}
+        <BrandedCanvas
+          backgroundImage={null} storyImage={null} headline=""
+          accentColor={activeBrand.accentColor}
+          logoUrl={brandSettings?.logoUrl || ''}
+          tagline={brandSettings?.fixedTagline || ''}
+          disclaimer={brandSettings?.footerDisclaimer || ''}
+          language="ar"
+          width={1080} height={1350}
+          brandId="marsad-alsouq"
+          cardType={activeTab}
+          cardLang="en"
+          cardData={activeTab === 'calendar' ? { ...calendar, events: calendar.events.filter(e => !(e as any)._hidden) } : currentCardData}
+          onExport={setEnDataUrl}
         />
       </div>
     </div>
