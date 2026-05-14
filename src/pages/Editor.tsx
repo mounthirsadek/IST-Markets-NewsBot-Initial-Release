@@ -136,7 +136,7 @@ export default function Editor() {
   const [previewTab, setPreviewTab] = useState<'classic' | 'ai-design'>('classic');
   const [aiCardEnUrl, setAiCardEnUrl] = useState('');
   const [aiCardArUrl, setAiCardArUrl] = useState('');
-  const [aiCardLang, setAiCardLang] = useState<'en' | 'ar'>('en');
+  const [aiCardModel, setAiCardModel] = useState<string>('gpt-image-1');
   const [aiCardGenerating, setAiCardGenerating] = useState(false);
   const [aiCardError, setAiCardError] = useState<string | null>(null);
 
@@ -299,7 +299,7 @@ export default function Editor() {
     return canvas.toDataURL('image/jpeg', 0.92);
   };
 
-  const handleGenerateAICard = async (lang: 'en' | 'ar') => {
+  const handleGenerateBoth = async () => {
     if (!enHeadline && !arHeadline) return;
     setAiCardGenerating(true);
     setAiCardError(null);
@@ -308,20 +308,28 @@ export default function Editor() {
       const aspectRatio = activeBrand.id === 'marsad-alsouq' ? '3:4' : fmt.aspectRatio;
       const w = activeBrand.id === 'marsad-alsouq' ? activeBrand.canvasWidth : fmt.width;
       const h = activeBrand.id === 'marsad-alsouq' ? activeBrand.canvasHeight : fmt.height;
-      const raw = await generateNewsCard({
+      const logoUrl = brandSettings?.logoUrl || '';
+      const base = {
         headlineEn: enHeadline,
         headlineAr: arHeadline,
         captionEn: enCaption,
         captionAr: arCaption,
         brandId: activeBrand.id,
-        language: lang,
         aspectRatio,
         accentColor: brandSettings?.defaultAccentColor || activeBrand.accentColor,
         disclaimer: brandSettings?.footerDisclaimer || '',
-      });
-      const composited = await compositeLogoOnCard(raw, brandSettings?.logoUrl || '', w, h);
-      if (lang === 'en') setAiCardEnUrl(composited);
-      else setAiCardArUrl(composited);
+        model: aiCardModel,
+      };
+      const [rawEn, rawAr] = await Promise.all([
+        generateNewsCard({ ...base, language: 'en' }),
+        generateNewsCard({ ...base, language: 'ar' }),
+      ]);
+      const [compEn, compAr] = await Promise.all([
+        compositeLogoOnCard(rawEn, logoUrl, w, h),
+        compositeLogoOnCard(rawAr, logoUrl, w, h),
+      ]);
+      setAiCardEnUrl(compEn);
+      setAiCardArUrl(compAr);
     } catch (e: any) {
       setAiCardError(e.message);
     } finally {
@@ -752,32 +760,36 @@ export default function Editor() {
           {/* ── AI Full Design Panel ── */}
           {previewTab === 'ai-design' && (
             <div className="space-y-4">
-              {/* Language toggle */}
+              {/* Model selector */}
               <div className="flex gap-2">
-                {(['en', 'ar'] as const).map(lang => (
+                {[
+                  { id: 'gpt-image-1', label: '✨ GPT Image 1', desc: 'Best quality' },
+                  { id: 'dall-e-3',    label: '⚡ DALL·E 3',    desc: 'Faster' },
+                ].map(m => (
                   <button
-                    key={lang}
-                    onClick={() => setAiCardLang(lang)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${
-                      aiCardLang === lang
-                        ? 'bg-[#f27d26]/20 border-[#f27d26]/50 text-[#f27d26]'
+                    key={m.id}
+                    onClick={() => setAiCardModel(m.id)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border flex flex-col items-center gap-0.5 ${
+                      aiCardModel === m.id
+                        ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                         : 'bg-white/5 border-white/10 text-white/40 hover:text-white/60'
                     }`}
                   >
-                    {lang === 'en' ? '🇬🇧 English' : '🇸🇦 Arabic'}
+                    <span>{m.label}</span>
+                    <span className="text-[9px] font-normal opacity-60">{m.desc}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Generate button */}
+              {/* Generate both button */}
               <button
-                onClick={() => handleGenerateAICard(aiCardLang)}
+                onClick={handleGenerateBoth}
                 disabled={aiCardGenerating || (!enHeadline && !arHeadline)}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-sm font-bold flex items-center justify-center gap-2 hover:from-purple-500/30 hover:to-pink-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {aiCardGenerating
-                  ? <><Loader2 className="animate-spin" size={15} /> GPT Image designing…</>
-                  : <><Sparkles size={15} /> Generate AI Card ({aiCardLang.toUpperCase()})</>
+                  ? <><Loader2 className="animate-spin" size={15} /> Generating AR + EN…</>
+                  : <><Sparkles size={15} /> Generate AI Card (AR + EN)</>
                 }
               </button>
 

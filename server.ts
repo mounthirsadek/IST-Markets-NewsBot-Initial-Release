@@ -739,11 +739,18 @@ async function startServer() {
   // ── AI Full Design — GPT Image-1 designs the entire news card ────────────────
   app.post('/api/ai/generate-news-card', checkAuth, async (req: any, res: any) => {
     try {
-      const { headlineEn, headlineAr, captionEn, captionAr, brandId, language, aspectRatio = '1:1', accentColor, disclaimer } = req.body;
+      const { headlineEn, headlineAr, captionEn, captionAr, brandId, language, aspectRatio = '1:1', accentColor, disclaimer, model = 'gpt-image-1' } = req.body;
       if (!headlineEn && !headlineAr) return res.status(400).json({ error: 'Missing headline' });
       if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
 
-      const size = OPENAI_SIZE_MAP[aspectRatio] ?? '1024x1024';
+      // DALL-E 3 only supports three fixed sizes
+      const DALLE3_SIZE_MAP: Record<string, string> = {
+        '1:1': '1024x1024', '3:4': '1024x1792', '9:16': '1024x1792',
+        '4:3': '1792x1024', '16:9': '1792x1024',
+      };
+      const size = model === 'dall-e-3'
+        ? (DALLE3_SIZE_MAP[aspectRatio] ?? '1024x1024')
+        : (OPENAI_SIZE_MAP[aspectRatio] ?? '1024x1024');
       const [w, h] = size.split('x').map(Number);
 
       let brandPrompt = '';
@@ -798,11 +805,11 @@ STYLE: Clean, high-contrast, editorial. Professional. No clutter. White space us
       }
 
       const response = await openai.images.generate({
-        model: 'gpt-image-1',
+        model,
         prompt: brandPrompt,
         n: 1,
         size,
-        quality: 'high',
+        quality: model === 'dall-e-3' ? 'hd' : 'high',
       } as any);
 
       const b64 = (response.data as any)?.[0]?.b64_json;

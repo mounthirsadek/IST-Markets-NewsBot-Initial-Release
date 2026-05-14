@@ -80,6 +80,8 @@ export interface NewsCardParams {
   aspectRatio: string;
   accentColor: string;
   disclaimer: string;
+  /** Image model — 'gpt-image-1' (default, best quality) | 'dall-e-3' (faster) */
+  model?: string;
 }
 
 export const generateNewsCard = (params: NewsCardParams): Promise<string> =>
