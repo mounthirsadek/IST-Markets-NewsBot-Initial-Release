@@ -736,21 +736,13 @@ async function startServer() {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // ── AI Full Design — GPT Image-1 designs the entire news card ────────────────
+  // ── AI Full Design — full card design via Gemini Imagen or GPT Image 2 ────────
   app.post('/api/ai/generate-news-card', checkAuth, async (req: any, res: any) => {
     try {
-      const { headlineEn, headlineAr, captionEn, captionAr, brandId, language, aspectRatio = '1:1', accentColor, disclaimer, model = 'gpt-image-1' } = req.body;
+      const { headlineEn, headlineAr, captionEn, captionAr, brandId, language, aspectRatio = '1:1', accentColor, disclaimer, model = 'gpt-image-2' } = req.body;
       if (!headlineEn && !headlineAr) return res.status(400).json({ error: 'Missing headline' });
-      if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY not configured' });
 
-      // DALL-E 3 only supports three fixed sizes
-      const DALLE3_SIZE_MAP: Record<string, string> = {
-        '1:1': '1024x1024', '3:4': '1024x1792', '9:16': '1024x1792',
-        '4:3': '1792x1024', '16:9': '1792x1024',
-      };
-      const size = model === 'dall-e-3'
-        ? (DALLE3_SIZE_MAP[aspectRatio] ?? '1024x1024')
-        : (OPENAI_SIZE_MAP[aspectRatio] ?? '1024x1024');
+      const size = OPENAI_SIZE_MAP[aspectRatio] ?? '1024x1024';
       const [w, h] = size.split('x').map(Number);
 
       let brandPrompt = '';
@@ -804,19 +796,36 @@ ACCENT COLOR: #${(accentColor || 'f27d26').replace('#', '')} throughout (borders
 STYLE: Clean, high-contrast, editorial. Professional. No clutter. White space used purposefully. No logos — top zone must remain empty.`;
       }
 
-      const response = await openai.images.generate({
-        model,
-        prompt: brandPrompt,
-        n: 1,
-        size,
-        quality: model === 'dall-e-3' ? 'hd' : 'high',
-      } as any);
+      let imageData: string;
 
-      const b64 = (response.data as any)?.[0]?.b64_json;
-      if (!b64) throw new Error('No image returned from OpenAI');
+      if (model === 'gemini') {
+        // ── Google Gemini Imagen ──────────────────────────────────────────────
+        const VALID_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9'];
+        const ratio = VALID_RATIOS.includes(aspectRatio) ? aspectRatio : '1:1';
+        const geminiRes = await ai.models.generateImages({
+          model: 'imagen-4.0-generate-001',
+          prompt: brandPrompt,
+          config: { numberOfImages: 1, aspectRatio: ratio },
+        });
+        const imageBytes = geminiRes.generatedImages?.[0]?.image?.imageBytes;
+        if (!imageBytes) throw new Error('No image returned from Gemini');
+        imageData = `data:image/png;base64,${imageBytes}`;
+      } else {
+        // ── OpenAI GPT Image 2 (default) ─────────────────────────────────────
+        if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+        const openaiRes = await openai.images.generate({
+          model: 'gpt-image-2',
+          prompt: brandPrompt,
+          n: 1,
+          size,
+        } as any);
+        const b64 = (openaiRes.data as any)?.[0]?.b64_json;
+        if (!b64) throw new Error('No image returned from OpenAI');
+        imageData = `data:image/png;base64,${b64}`;
+      }
 
-      await logAction(req.user.id, 'GENERATE_AI_CARD', 'story', null, `Brand: ${brandId}, Lang: ${language}`);
-      res.json({ imageData: `data:image/png;base64,${b64}` });
+      await logAction(req.user.id, 'GENERATE_AI_CARD', 'story', null, `Brand: ${brandId}, Lang: ${language}, Model: ${model}`);
+      res.json({ imageData });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

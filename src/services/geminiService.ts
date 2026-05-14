@@ -80,7 +80,7 @@ export interface NewsCardParams {
   aspectRatio: string;
   accentColor: string;
   disclaimer: string;
-  /** Image model — 'gpt-image-1' (default, best quality) | 'dall-e-3' (faster) */
+  /** Image model — 'gpt-image-2' (default, OpenAI) | 'gemini' (Google Imagen) */
   model?: string;
 }
 

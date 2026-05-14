@@ -152,7 +152,7 @@ export default function HooksEditor() {
   const [previewTab, setPreviewTab] = useState<'classic' | 'ai-design'>('classic');
   const [aiCardEnUrl, setAiCardEnUrl] = useState('');
   const [aiCardArUrl, setAiCardArUrl] = useState('');
-  const [aiCardModel, setAiCardModel] = useState<string>('gpt-image-1');
+  const [aiCardModel, setAiCardModel] = useState<string>('gpt-image-2');
   const [aiCardGenerating, setAiCardGenerating] = useState(false);
   const [aiCardError, setAiCardError] = useState<string | null>(null);
 
@@ -789,8 +789,8 @@ export default function HooksEditor() {
               {/* Model selector */}
               <div className="flex gap-2">
                 {[
-                  { id: 'gpt-image-1', label: '✨ GPT Image 1', desc: 'Best quality' },
-                  { id: 'dall-e-3',    label: '⚡ DALL·E 3',    desc: 'Faster' },
+                  { id: 'gpt-image-2', label: '🟢 GPT Image 2', desc: 'ChatGPT · OpenAI' },
+                  { id: 'gemini',      label: '🔵 Gemini Imagen', desc: 'Google AI' },
                 ].map(m => (
                   <button
                     key={m.id}
